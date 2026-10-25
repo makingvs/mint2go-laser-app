@@ -1,0 +1,8 @@
+node_modules/
+dist/
+Laser-Eingang/
+Projekte/
+einstellungen.json
+*.log
+public/library/
+.claude/

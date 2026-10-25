@@ -1,0 +1,20 @@
+{
+  "plate": {
+    "width": 300,
+    "height": 200
+  },
+  "colors": {
+    "cut": "#FF0000",
+    "engrave": "#0000FF",
+    "fill": "#000000"
+  },
+  "minSize": 3,
+  "onlineSearch": {
+    "enabled": true,
+    "sets": [
+      "fluent-emoji-high-contrast",
+      "noto",
+      "fluent-emoji-flat"
+    ]
+  }
+}

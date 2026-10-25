@@ -1,0 +1,30 @@
+Offene SVG-Bibliothek für das Bilder-Menü
+=========================================
+
+Lege hier SVG-Dateien in Unterordnern ab:
+
+    Grafiken\Tiere\fuchs.svg
+    Grafiken\🚗 Fahrzeuge\bus.svg
+
+Jeder Unterordner wird ein Reiter im Bilder-Menü der App. Beginnt der Ordnername
+mit einem Emoji (z. B. "🐾 Tiere"), wird es als Reiter-Symbol verwendet.
+Neue Dateien erscheinen sofort, wenn das Bilder-Menü neu geöffnet wird -
+ein Neustart des Servers ist nicht nötig. Alternativ im Lehrkraft-Bereich der App
+SVG-Dateien hochladen.
+
+Was gut funktioniert
+- Silhouetten und Umrisse aus gefüllten Formen (Pfade, Rechtecke, Kreise, Polygone)
+- Löcher (Augen, Fenster) als Pfad mit fill-rule="evenodd" bzw. gegenläufigen Teilpfaden
+- Überlappende Formen werden zu einem Umriss vereint
+
+Was übersprungen wird
+- Text (bitte vorher in Pfade umwandeln), eingebettete Bilder, Verläufe, Filter,
+  <use>, Clip-Pfade und Masken; weiße Füllungen gelten als Hintergrund
+- Dateien mit Skripten werden beim Hochladen abgelehnt; maximal 2 MB je Datei
+
+Lizenzen
+Verwende nur Bilder, die du verwenden darfst. Geeignet sind z. B. Werke unter CC0 /
+Public Domain (etwa auf openclipart.org oder svgrepo.com, dort nach der Lizenz filtern).
+Bei Lizenzen mit Namensnennung (CC BY, OpenMoji: CC BY-SA 4.0) muss die Quelle
+genannt werden.
+Die vier Beispiele in "⭐ Beispiele" sind selbst gezeichnet und frei verwendbar.
