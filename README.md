@@ -6,6 +6,14 @@ Eigenständige Web-App für Kinder (6–10 Jahre): Formen, Bilder, Text und Frei
 - Nach dem ersten Öffnen läuft die App **offline** (Service Worker) und lässt sich als Symbol auf den **Home-Bildschirm** legen (Vollbild, Querformat).
 - Das „Senden“ an einen PC ist vorerst ausgeklammert (siehe unten „Später: Senden“).
 
+## App öffnen (iPad)
+
+**https://makingvs.github.io/mint2go-laser-app/** – auf dem iPad in Safari öffnen oder den QR-Code scannen (Kamera-App):
+
+![QR-Code zur App](docs/ipad-qr.png)
+
+Dann Teilen-Symbol → **Zum Home-Bildschirm**, einmal von dort starten – danach läuft die App auch offline. Die Seite wird bei jedem Push auf `main` automatisch neu gebaut und veröffentlicht (`.github/workflows/pages.yml`, GitHub Pages).
+
 ## Design (MINT2Go)
 
 Die Oberfläche folgt dem Corporate Design von **MINT2Go – MINT erleben**: weiß, freundlich, rund, modern.
