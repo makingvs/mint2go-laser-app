@@ -104,3 +104,28 @@ describe('ZIP', () => {
     expect(text).not.toContain('_3.svg');
   });
 });
+
+import { sanitizeFileName } from '../src/names';
+import { textInfo } from '../src/fonts';
+
+describe('Dateiname festlegen', () => {
+  it('bereinigt die Eingabe und hängt die Endung genau einmal an', () => {
+    expect(sanitizeFileName('Mein Fuchs', 'svg')).toBe('Mein Fuchs.svg');
+    expect(sanitizeFileName('  Mein   Fuchs.SVG ', 'svg')).toBe('Mein Fuchs.svg');
+    expect(sanitizeFileName('a/b\c:d*e?f"g<h>i|j', 'svg')).toBe('abcdefghij.svg');
+    expect(sanitizeFileName('Größe & Ärger', 'zip')).toBe('Größe & Ärger.zip');
+    expect(sanitizeFileName('...versteckt', 'svg')).toBe('versteckt.svg');
+    expect(sanitizeFileName('x'.repeat(200), 'svg')).toHaveLength(84);
+    expect(sanitizeFileName('', 'svg')).toBe('');
+    expect(sanitizeFileName(' / : ', 'svg')).toBe('');
+  });
+});
+
+describe('Text nachträglich ändern', () => {
+  it('liest Schrift und Wortlaut aus den Angaben oder (ältere Arbeiten) aus ref', () => {
+    expect(textInfo({ kind: 'shape', ref: 'x' })).toBeNull();
+    expect(textInfo({ kind: 'text', ref: 'x', text: { font: 'fredoka', value: 'Lena' } })).toMatchObject({ value: 'Lena', font: { id: 'fredoka' } });
+    expect(textInfo({ kind: 'text', ref: 'pacifico:Mia: hallo' })).toMatchObject({ value: 'Mia: hallo', font: { id: 'pacifico' } });
+    expect(textInfo({ kind: 'text', ref: 'LENA' })).toMatchObject({ value: 'LENA', font: { id: 'block' } });
+  });
+});

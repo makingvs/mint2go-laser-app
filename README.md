@@ -57,6 +57,8 @@ Die Pfade sind relativ (`base: './'`), die App funktioniert daher auch in einem 
 
 ## Export der SVGs
 
+**Vor jedem Export/Download fragt die App nach dem Dateinamen** (Vorschlag: `<Kind>_<Datum>_<Uhrzeit>`, die Endung `.svg` bzw. `.zip` steht fest daneben). Ungültige Zeichen (` / : * ? " < > |`) werden entfernt, ein leerer Name ist nicht möglich. Das gilt für die grüne Export-Taste, für „Arbeit exportieren“ in der Galerie und für beide ZIP-Exporte.
+
 - **Exportieren-Taste** (grün, oben rechts): Auf dem iPad öffnet sich das **Teilen-Menü** → „In Dateien sichern“, AirDrop, Mail … Auf dem Computer wird die Datei heruntergeladen. Dateiname: `<Kind>_<Datum>_<Uhrzeit>.svg`.
 - **Galerie**: Pfeil-Taste an jeder Arbeit = diese Arbeit exportieren; Pfeil oben rechts = **alle Arbeiten dieses Kindes als ZIP**.
 - **Lehrkraft-Bereich → „Alle SVGs als ZIP exportieren“**: alle Kinder, je ein Ordner pro Kind.
@@ -132,6 +134,14 @@ Alle Werkzeugtasten haben die **Schrift unter dem Symbol** (Galerie, Zurück, Vo
 - **Zeichen:** Pfeil, Kreuz, Blitz, Mond, Wolke, Tropfen, Sprechblase, Haus, Ring, Rahmen (Ring und Rahmen haben ein Loch, das beim Schneiden mit ausgeschnitten wird)
 
 Neue Formen: in `src/shapes.ts` ergänzen (ID, Gruppe, Name, Geometrie); Symbol und Auswahl entstehen automatisch, `tests/shapes.test.ts` prüft sie.
+
+## Text nachträglich ändern
+
+Ein Text-Teil antippen, dann oben die Taste **Schrift**: Es öffnet sich die Texteingabe mit dem vorhandenen Wortlaut und der aktuellen Schrift. Schrift und/oder Text ändern, ✓ – Lage, Drehung, Bearbeitungsart (Schere/Stift/Farbrolle) und die Größe, die das Kind eingestellt hat (relativ zur Standardgröße), bleiben erhalten. Der Schritt lässt sich mit „Zurück“ rückgängig machen. (Die Taste ist nur bei ausgewähltem Text aktiv.)
+
+## Bildschirmgrößen
+
+Die Oberfläche passt sich der Fensterhöhe an (normal ab ca. 760 px, kompakt darunter, sehr kompakt unter 640 px: kleinere Tasten, Dialoge höchstens so hoch wie das Fenster, Formen-Auswahl bleibt im Fenster). Geprüft mit einem Skript, das in allen Ansichten und Dialogen (Startseite, Benutzer, Lehrkraft, Lizenzen, Galerie, Zeichenfläche wählen, Editor, Formen-Auswahl, Text, Schrift ändern, Suche, Zahlentastatur, Dateiname) überdeckte, abgeschnittene und außerhalb liegende Tasten sucht: ohne Befund bei 1366×1024, 1180×820, 1133×744, 1024×768, 1024×650, 900×600 und 800×560. Hochformat zeigt den Hinweis „Gerät drehen“.
 
 ## Text und Schriftarten
 

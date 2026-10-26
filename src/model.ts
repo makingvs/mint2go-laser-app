@@ -19,6 +19,8 @@ export interface El {
   h: number;
   rot: number;
   op: Op;
+  /** Bei Text: Schrift, Wortlaut und Maße bei der Erstellung (zum nachträglichen Ändern der Schrift) */
+  text?: { font: string; value: string; w0: number; h0: number };
 }
 
 /** Zeichenfläche: unendlich oder ein Werkstück mit Form und Maßen in mm (Ursprung oben links). */

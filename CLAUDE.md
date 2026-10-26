@@ -27,6 +27,11 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 - Schrift Jost (@fontsource-variable/jost, OFL), Logo public/mint2go-logo.png, Zierelemente src/decor.ts, Tokens in :root von src/style.css
 - Laserfarben (Rot/Blau/Schwarz) NICHT ans CD anpassen: sie sind die Linienfarben der SVG-Ebenen
 
+## Bedienung (Regeln)
+- Jeder Export/Download fragt vorher den Dateinamen ab (src/saveDialog.ts, sanitizeFileName); Speichern startet direkt im Tipp auf ✓ (Teilen-Menü braucht eine Benutzeraktion)
+- Text-Teile merken Schrift/Wortlaut (El.text) und sind über die Taste "Schrift" nachträglich änderbar (replaceText)
+- Layout: Größen über CSS-Variablen je Fensterhöhe (:root + @media max-height 760/640); nach Layout-Änderungen auf mehreren Größen prüfen (Überdeckungen/Abschneiden)
+
 ## Schriften und Lizenzen (verbindlich)
 - Text: Block (eigene Strichschrift) + 7 Webschriften (src/fonts.ts), alle SIL OFL 1.1 ohne Reserved Font Name; Text wird per Canvas gezeichnet und mit src/trace.ts zu Umrissen
 - Neue Schrift/Bildquelle NUR mit: Lizenzdatei in public/licenses/ (scripts/copy-licenses.mjs für Schriften), Eintrag in THIRD-PARTY-NOTICES.md,
@@ -93,6 +98,7 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 - server/server.mjs: optionaler Server (nicht von der App benutzt); tests/: Vitest
 
 ## Stand
+26.10.2026 (Layout/Dateiname/Schrift ändern): Layout-Prüfung auf 7 Fenstergrößen (ohne Befund nach Anpassung: höhenabhängige Größen, Formen-Auswahl im Fenster, Zahlentastatur/Dialoge scrollbar, Galerie-Tasten unter dem Bild), Dateiname vor jedem Export, Text/Schrift nachträglich änderbar. 94 Tests grün.
 26.10.2026 (Icons/Beschriftung/Formen): Symbole vereinheitlicht (Formen-Symbole mit gleicher optischer Größe, neue Symbole für Fläche/Formen/Freihand), Schrift unter allen Werkzeugtasten, 29 vorgefertigte Formen in 3 Gruppen. 92 Tests grün.
 26.10.2026 (Leiste/Schriften/Lizenzen): Leiste gruppiert, Formen-Auswahl (9 Formen), Freihand direkt darunter; 8 Schriftarten für Text; Lizenzprüfung:
 Schriften OFL (Texte beigelegt), Noto Emoji aus der Suche entfernt, Fluent Emoji MIT mit Hinweis in der App; Test für Lizenzdateien. 87 Tests grün.

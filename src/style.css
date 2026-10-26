@@ -401,7 +401,7 @@ input {
   overflow-y: auto;
 }
 .key {
-  height: 66px;
+  height: var(--key-h);
   border-radius: 14px;
   background: var(--soft);
   box-shadow: 0 2px 0 var(--line), 0 0 0 2px var(--line) inset;
@@ -786,7 +786,7 @@ input {
 /* ---------- Maße ---------- */
 .dims {
   flex: none;
-  height: 64px;
+  height: var(--dims-h);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -901,7 +901,7 @@ input {
   gap: 10px;
 }
 .np-keys .key {
-  height: 74px;
+  height: var(--np-key-h);
   font-size: 34px;
 }
 .numpad .confirm-row {
@@ -1688,18 +1688,34 @@ input {
 /* =====================================================================
    Beschriftete Werkzeugtasten: Symbol oben, Schrift darunter
    ===================================================================== */
+:root {
+  --tb-h: 98px;
+  --lb-h: 78px;
+  --lb-w: 72px;
+  --ico: 34px;
+  --lbl: 13.5px;
+  --rail-w: 78px;
+  --op-h: 100px;
+  --op-w: 92px;
+  --op-ico: 46px;
+  --zoom-h: 66px;
+  --zoom-ico: 26px;
+  --dims-h: 64px;
+  --key-h: 66px;
+  --np-key-h: 74px;
+}
 .btn.labeled {
   flex-direction: column;
   justify-content: center;
   gap: 3px;
   width: auto;
-  min-width: 72px;
-  height: 78px;
-  padding: 6px 8px 5px;
+  min-width: var(--lb-w);
+  height: var(--lb-h);
+  padding: 5px 8px 4px;
 }
 .btn.labeled .ico {
-  width: 34px;
-  height: 34px;
+  width: var(--ico);
+  height: var(--ico);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1709,7 +1725,7 @@ input {
   height: 100%;
 }
 .btn .lbl {
-  font-size: 13.5px;
+  font-size: var(--lbl);
   font-weight: 700;
   line-height: 1.05;
   letter-spacing: 0.1px;
@@ -1729,39 +1745,39 @@ input {
   color: var(--muted);
 }
 .topbar {
-  height: 98px;
+  height: var(--tb-h);
 }
 .top-group {
   gap: 8px;
 }
 .left-rail .btn.labeled.tool {
-  width: 78px;
-  min-width: 78px;
+  width: var(--rail-w);
+  min-width: var(--rail-w);
 }
 .btn.op.labeled {
-  width: 92px;
-  height: 100px;
+  width: var(--op-w);
+  height: var(--op-h);
   border-radius: 26px;
   gap: 4px;
 }
 .btn.op.labeled .ico {
-  width: 46px;
-  height: 46px;
+  width: var(--op-ico);
+  height: var(--op-ico);
 }
 .btn.op .lbl {
   color: var(--ink);
   font-size: 14.5px;
 }
 .btn.zoom.labeled {
-  width: 78px;
-  min-width: 78px;
-  height: 66px;
+  width: var(--rail-w);
+  min-width: var(--rail-w);
+  height: var(--zoom-h);
   gap: 1px;
   padding: 5px 6px 3px;
 }
 .btn.zoom.labeled .ico {
-  width: 26px;
-  height: 26px;
+  width: var(--zoom-ico);
+  height: var(--zoom-ico);
 }
 .btn.zoom .lbl {
   font-size: 12.5px;
@@ -1801,4 +1817,206 @@ input {
   width: 64px;
   height: 64px;
   border-radius: 18px;
+}
+
+/* =====================================================================
+   Anpassung an die Fensterhöhe (iPad im Safari mit Adressleiste, kleine Fenster)
+   Normal: ab ca. 760 px Höhe. Kompakt: darunter. Sehr kompakt: unter 640 px.
+   ===================================================================== */
+@media (max-height: 760px) {
+  :root {
+    --tb-h: 84px;
+    --lb-h: 66px;
+    --lb-w: 66px;
+    --ico: 28px;
+    --lbl: 12.5px;
+    --rail-w: 72px;
+    --op-h: 82px;
+    --op-w: 86px;
+    --op-ico: 36px;
+    --zoom-h: 54px;
+    --zoom-ico: 22px;
+    --dims-h: 56px;
+    --key-h: 58px;
+    --np-key-h: 62px;
+  }
+  .rail-group {
+    padding: 8px 6px 6px;
+    gap: 6px;
+  }
+  .left-rail {
+    gap: 8px;
+  }
+  .right-rail {
+    gap: 8px;
+    width: 96px;
+  }
+  .zoom-box {
+    gap: 4px;
+    padding-top: 6px;
+  }
+  .zoom-label {
+    height: 14px;
+    font-size: 13px;
+  }
+  .editor-body {
+    padding-top: 12px;
+    padding-bottom: 10px;
+  }
+  .dim {
+    height: 48px;
+    font-size: 21px;
+  }
+  .btn.send.labeled {
+    min-width: 84px;
+  }
+}
+@media (max-height: 640px) {
+  :root {
+    --tb-h: 70px;
+    --lb-h: 54px;
+    --lb-w: 58px;
+    --ico: 24px;
+    --lbl: 11.5px;
+    --rail-w: 64px;
+    --op-h: 68px;
+    --op-w: 78px;
+    --op-ico: 30px;
+    --zoom-h: 44px;
+    --zoom-ico: 19px;
+    --dims-h: 50px;
+    --key-h: 46px;
+    --np-key-h: 48px;
+  }
+  .rail-group {
+    padding: 6px 5px 5px;
+    gap: 4px;
+    border-top-width: 4px;
+  }
+  .right-rail {
+    gap: 6px;
+    width: 88px;
+  }
+  .zoom-label {
+    display: none;
+  }
+  .dim {
+    height: 42px;
+    font-size: 19px;
+  }
+  .np-display {
+    height: 60px;
+    font-size: 36px;
+  }
+  .big-btn {
+    height: 64px;
+  }
+}
+
+/* Dialoge: nie höher als das Fenster, Inhalt scrollt */
+.numpad {
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
+}
+.panel {
+  max-height: calc(100vh - 20px);
+}
+.text-panel {
+  overflow: hidden;
+}
+.text-panel .keys {
+  min-height: 0;
+  flex: 1;
+}
+
+/* Schriftwahl: alle Schriften sichtbar (umbrechen statt seitlich scrollen) */
+.font-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(92px, 1fr));
+  gap: 8px;
+  overflow: visible;
+}
+.font-chip {
+  min-width: 0;
+  height: 54px;
+  padding: 0 8px;
+  font-size: 26px;
+}
+@media (max-height: 640px) {
+  .font-chip {
+    height: 44px;
+    font-size: 22px;
+  }
+  .font-chip svg {
+    height: 26px;
+    width: 64px;
+  }
+  .text-preview {
+    height: 64px;
+  }
+}
+
+/* Galerie: Tasten unter dem Vorschaubild statt darüber */
+.card-grid {
+  grid-auto-rows: 220px;
+}
+.work-card {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+}
+.work-open {
+  flex: 1;
+  min-height: 0;
+}
+.work-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 12px 10px;
+}
+.work-actions .work-del,
+.work-actions .work-export {
+  position: static;
+  width: 52px;
+  height: 52px;
+}
+.work-actions .work-del {
+  background: var(--soft);
+  box-shadow: 0 0 0 2px var(--line) inset;
+}
+
+/* Dateiname festlegen */
+.save-panel {
+  width: min(720px, 100%);
+}
+.save-panel .panel-head {
+  gap: 10px;
+}
+.save-ico {
+  width: 40px;
+  height: 40px;
+  color: var(--muted);
+  flex: none;
+  display: flex;
+}
+.save-ico .icon {
+  width: 100%;
+  height: 100%;
+}
+.save-ext {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* Schriftwahl: gleichmäßig verteilt (8 nebeneinander, bei schmalem Fenster 4 + 4) */
+.font-row {
+  grid-template-columns: repeat(8, 1fr);
+}
+@media (max-width: 880px) {
+  .font-row {
+    grid-template-columns: repeat(4, 1fr);
+  }
 }

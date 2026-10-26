@@ -35,8 +35,9 @@ export async function saveFile(name: string, data: BlobPart, mime: string): Prom
   return 'downloaded';
 }
 
-export function saveSvg(profile: Pick<Profile, 'name'>, design: Pick<Design, 'elements'>, settings: Settings): Promise<SaveResult> {
-  return saveFile(exportFileName(profile.name), exportSvg(design, settings), 'image/svg+xml');
+/** SVG speichern; der Dateiname kommt aus dem Dialog (Vorgabe: <Kind>_<Datum>_<Uhrzeit>.svg). */
+export function saveSvg(profile: Pick<Profile, 'name'>, design: Pick<Design, 'elements' | 'surface'>, settings: Settings, fileName: string = exportFileName(profile.name)): Promise<SaveResult> {
+  return saveFile(fileName, exportSvg(design, settings), 'image/svg+xml');
 }
 
 /** ZIP mit je einem Ordner pro Kind: <Kind>/<Kind>_<Datum>_<Uhrzeit>.svg */

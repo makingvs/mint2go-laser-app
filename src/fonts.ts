@@ -29,6 +29,15 @@ export const FONTS: FontChoice[] = [
   { id: 'pacifico', label: 'Pacifico', family: 'Pacifico', weight: 400, license: 'font-pacifico', copyright: 'The Pacifico Project Authors', url: 'https://github.com/googlefonts/Pacifico' },
 ];
 
+/** Schrift und Wortlaut eines Text-Teils; ältere Arbeiten ohne Angabe werden aus ref gelesen. */
+export function textInfo(e: { kind: string; ref: string; text?: { font: string; value: string } }): { font: FontChoice; value: string } | null {
+  if (e.kind !== 'text') return null;
+  if (e.text) return { font: fontById(e.text.font), value: e.text.value };
+  const m = /^([a-z]+):(.*)$/s.exec(e.ref);
+  if (m && FONTS.some((f) => f.id === m[1])) return { font: fontById(m[1]), value: m[2] };
+  return { font: FONTS[0], value: e.ref };
+}
+
 export const fontById = (id: string): FontChoice => FONTS.find((f) => f.id === id) ?? FONTS[0];
 
 /** CSS für Vorschau/Schriftmuster. */

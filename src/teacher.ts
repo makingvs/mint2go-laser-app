@@ -2,6 +2,7 @@
 // eigene SVG-Bilder, Export aller Arbeiten. Die Einstellungen gelten für dieses Gerät.
 import { button, h, overlay } from './dom';
 import { buildZip, saveFile, zipName } from './exporter';
+import { openSaveDialog } from './saveDialog';
 import { ICONS } from './icons';
 import type { Settings } from './model';
 import { storage } from './storage';
@@ -79,8 +80,14 @@ export function openTeacher(current: Settings, onSaved: (s: Settings) => void): 
         exportResult.textContent = 'Noch keine Arbeiten vorhanden.';
         return;
       }
-      await saveFile(zipName('Laser-Arbeiten'), buildZip(designs, profiles, s), 'application/zip');
-      exportResult.textContent = `${n} Arbeit(en) exportiert (ein Ordner je Kind).`;
+      openSaveDialog({
+        defaultName: zipName('Laser-Arbeiten'),
+        ext: 'zip',
+        onSave: async (fileName) => {
+          await saveFile(fileName, buildZip(designs, profiles, s), 'application/zip');
+          exportResult.textContent = `${n} Arbeit(en) exportiert (ein Ordner je Kind).`;
+        },
+      });
     }),
     exportResult,
   );

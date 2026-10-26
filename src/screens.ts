@@ -3,6 +3,8 @@ import { cdLineMarkup, gearsMarkup } from './decor';
 import { openLicenses } from './licenses';
 import { button, confirmDialog, h, onLongPress, overlay } from './dom';
 import { buildZip, saveFile, saveSvg, zipName } from './exporter';
+import { exportFileName } from './names';
+import { openSaveDialog } from './saveDialog';
 import { ANIMALS, ICONS } from './icons';
 import { thumbnailSvg } from './render';
 import { safeName } from './names';
@@ -120,7 +122,11 @@ export function galleryScreen(
       exportAll.classList.add('shake');
       return;
     }
-    await saveFile(zipName(profile.name), buildZip(designs, [profile], settings), 'application/zip');
+    openSaveDialog({
+      defaultName: zipName(profile.name),
+      ext: 'zip',
+      onSave: (fileName) => void saveFile(fileName, buildZip(designs, [profile], settings), 'application/zip'),
+    });
   }, 'Alle exportieren');
   const deleteUser = button('btn danger', ICONS.trash, async () => {
     if (!(await confirmDialog(ICONS.trash))) return;
@@ -153,8 +159,12 @@ export function galleryScreen(
           }
           void load();
         }, 'Löschen');
-        const exp = button('work-export', ICONS.download, () => void saveSvg(profile, d, settings), 'Exportieren');
-        card.append(open, del, exp);
+        const exp = button('work-export', ICONS.download, () => openSaveDialog({
+          defaultName: exportFileName(profile.name, new Date(d.updated || d.created || Date.now())),
+          ext: 'svg',
+          onSave: (fileName) => void saveSvg(profile, d, settings, fileName),
+        }), 'Exportieren');
+        card.append(open, h('div', 'work-actions', '')); card.querySelector('.work-actions')!.append(exp, del);
         grid.append(card);
       }
     } catch {

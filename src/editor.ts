@@ -2,16 +2,18 @@
 import { storage, type Profile } from './storage';
 import { openTraceDialog } from './imageDialog';
 import { saveSvg } from './exporter';
+import { openSaveDialog } from './saveDialog';
+import { exportFileName } from './names';
 import { svgToShape } from './svgImport';
 import { bbox, dist, resample, shapeToPath, simplify, smooth, transformPoint, type Pt, type Ring, type Shape } from './geometry';
 import { ICONS, SHAPE_ICONS } from './icons';
-import { History, isTooThin, makeElement, newId, pickElement, type Design, type El, type Op, type Settings, type Surface, worldShape } from './model';
+import { History, isTooThin, makeElement, newId, normalizeBase, pickElement, type Design, type El, type Op, type Settings, type Surface, worldShape } from './model';
 import { canvasBackground, elementMarkup } from './render';
 import { MAX_ZOOM, defaultSurface, isFree, isOutside, surfaceKey, surfaceSize, viewFor, zoomedView, type View } from './surface';
 import { openSurfaceDialog } from './surfaceDialog';
 import { SHAPE_GROUPS, SHAPE_LABELS, baseShape, type ShapeId } from './shapes';
-import { GLYPH_HEIGHT, normalizeText, textShape } from './text';
-import { FONTS, fontStyle, fontTextShape, type FontChoice } from './fonts';
+import { GLYPH_HEIGHT, textShape } from './text';
+import { FONTS, fontStyle, fontTextShape, textInfo, type FontChoice } from './fonts';
 import { button, confirmDialog, h, lab, onLongPress, overlay } from './dom';
 import { openTeacher } from './teacher';
 import { cdLineMarkup } from './decor';
@@ -142,7 +144,8 @@ export class Editor {
     this.btn.dup = button('btn labeled', lab(ICONS.copy, 'Kopie'), () => this.duplicate(), 'Kopieren');
     this.btn.del = button('btn labeled danger', lab(ICONS.trash, 'Löschen'), () => void this.remove(), 'Löschen');
     this.btn.export = button('btn labeled send', lab(ICONS.download, 'Export'), () => void this.exportNow(), 'Exportieren');
-    right.append(this.btn.dup, this.btn.del, this.btn.export);
+    this.btn.font = button('btn labeled', lab(ICONS.text, 'Schrift'), () => this.editText(), 'Schrift ändern');
+    right.append(this.btn.font, this.btn.dup, this.btn.del, this.btn.export);
     top.append(left, center, right, h('div', 'cd-wrap top-line', cdLineMarkup()));
 
     const body = h('div', 'editor-body');
@@ -431,6 +434,7 @@ export class Editor {
     this.btn.undo.disabled = !this.history.canUndo;
     this.btn.redo.disabled = !this.history.canRedo;
     this.btn.dup.disabled = !sel;
+    this.btn.font.disabled = !sel || sel.kind !== 'text';
     this.btn.del.disabled = !sel;
     this.btn.draw.classList.toggle('active', this.drawMode);
     this.btn.zoomIn.disabled = this.zoom >= MAX_ZOOM - 0.01;
@@ -667,6 +671,11 @@ export class Editor {
     });
     this.btn.shapes.classList.add('active');
     o.root.append(fly);
+    // im Fenster halten: nach oben schieben, wenn unten nicht genug Platz ist
+    // offsetHeight statt getBoundingClientRect: unabhängig von der Einblend-Animation (Skalierung)
+    const top = Math.max(8, Math.min(parseFloat(fly.style.top), window.innerHeight - fly.offsetHeight - 10));
+    fly.style.top = `${top}px`;
+    fly.style.maxHeight = `${window.innerHeight - 16}px`;
   }
 
   private addShape(id: ShapeId): void {
@@ -675,36 +684,75 @@ export class Editor {
     this.add(makeElement({ kind: 'shape', ref: id, rings: baseShape(id), op: this.currentOp, size, x, y }));
   }
 
-  /** Text einfügen: Block = eigene Strichschrift (Vektor), sonst Webschrift -> Umrisse. */
-  private async addText(text: string, font: FontChoice): Promise<void> {
-    const clean = text.trim();
-    if (!clean) return;
-    const maxW = surfaceSize(this.surface).w * 0.9;
+  /** Text zeichnen: Block = eigene Strichschrift (Vektor), sonst Webschrift -> Umrisse. */
+  private async buildText(text: string, font: FontChoice): Promise<{ rings: Shape; nw: number; nh: number; scale: number } | null> {
     let rings: Shape;
     let scale: number;
     if (!font.family) {
-      rings = textShape(clean);
+      rings = textShape(text);
       scale = 26 / GLYPH_HEIGHT; // Höhe der Großbuchstaben ca. 26 mm
     } else {
       const busy = overlay('overlay-dim');
       busy.root.append(h('div', 'send-card', `<div class="spinner">${ICONS.text}</div>`));
       try {
-        const ft = await fontTextShape(font, clean);
+        const ft = await fontTextShape(font, text);
         rings = ft.rings;
         scale = 36 / ft.px; // 1 em = 36 mm (Großbuchstaben ca. 25 mm)
       } catch {
+        return null;
+      } finally {
         busy.close();
-        return;
       }
-      busy.close();
     }
-    if (!rings.length) return;
+    if (!rings.length) return null;
     const b = bbox(rings);
-    const nw = b.maxX - b.minX;
-    const nh = b.maxY - b.minY;
-    if (nw * scale > maxW) scale = maxW / nw;
+    return { rings, nw: b.maxX - b.minX, nh: b.maxY - b.minY, scale };
+  }
+
+  /** Neuen Text einfügen. */
+  private async addText(text: string, font: FontChoice): Promise<void> {
+    const clean = text.trim();
+    if (!clean) return;
+    const t = await this.buildText(clean, font);
+    if (!t) return;
+    let scale = t.scale;
+    const maxW = surfaceSize(this.surface).w * 0.9;
+    if (t.nw * scale > maxW) scale = maxW / t.nw;
     const [x, y] = this.center();
-    this.add(makeElement({ kind: 'text', ref: `${font.id}:${normalizeText(clean)}`, rings, op: this.currentOp, size: 0, x, y, exact: { w: nw * scale, h: nh * scale } }));
+    const el = makeElement({ kind: 'text', ref: `${font.id}:${clean}`, rings: t.rings, op: this.currentOp, size: 0, x, y, exact: { w: t.nw * scale, h: t.nh * scale } });
+    el.text = { font: font.id, value: clean, w0: t.nw * scale, h0: t.nh * scale };
+    this.add(el);
+  }
+
+  /** Schrift und/oder Wortlaut eines vorhandenen Textes ändern; Lage, Drehung, Bearbeitungsart und vom Kind gewählte Größe bleiben. */
+  private async replaceText(el: El, text: string, font: FontChoice): Promise<void> {
+    const clean = text.trim();
+    if (!clean) return;
+    const t = await this.buildText(clean, font);
+    if (!t) return;
+    const cur = this.els.find((e) => e.id === el.id);
+    if (!cur) return;
+    // Faktor, um den das Kind den Text vergrößert/verkleinert hat
+    const k = cur.text ? (cur.w / cur.text.w0 + cur.h / cur.text.h0) / 2 : 1;
+    const area = surfaceSize(this.surface);
+    const cap = Math.max(area.w, area.h) * 3;
+    let f = k;
+    if (Math.max(t.nw, t.nh) * t.scale * f > cap) f = cap / (Math.max(t.nw, t.nh) * t.scale);
+    cur.base = normalizeBase(t.rings).base;
+    cur.w = t.nw * t.scale * f;
+    cur.h = t.nh * t.scale * f;
+    cur.ref = `${font.id}:${clean}`;
+    cur.text = { font: font.id, value: clean, w0: t.nw * t.scale, h0: t.nh * t.scale };
+    this.thinCache.clear();
+    this.outsideCache.clear();
+    this.selectedId = cur.id;
+    this.commit();
+  }
+
+  /** Taste "Schrift": Dialog mit dem vorhandenen Text und der aktuellen Schrift öffnen. */
+  private editText(): void {
+    const sel = this.selected;
+    if (sel && sel.kind === 'text') this.openText(sel);
   }
 
   private setOp(op: Op): void {
@@ -816,21 +864,22 @@ export class Editor {
     );
   }
 
-  private openText(): void {
+  private openText(edit?: El): void {
     this.drawMode = false;
     const o = overlay('overlay-dim');
     const panel = h('div', 'panel text-panel');
     const preview = h('div', 'text-preview');
     const fontRow = h('div', 'font-row');
     const keys = h('div', 'keys');
-    let text = '';
-    let font = FONTS[0];
+    const info = edit ? textInfo(edit) : null;
+    let text = info?.value ?? '';
+    let font = info?.font ?? FONTS[0];
     let upper = true;
     const ok = button('btn key-ok', ICONS.check, () => {
       const t = text;
       const f = font;
       o.close();
-      void this.addText(t, f);
+      void (edit ? this.replaceText(edit, t, f) : this.addText(t, f));
     }, 'Fertig');
 
     const refresh = () => {
@@ -966,15 +1015,21 @@ export class Editor {
     }
     this.selectedId = null;
     this.render();
-    // Zuerst exportieren: Das Teilen-Menü muss direkt aus dem Tipp heraus geöffnet werden.
-    const result = await saveSvg(this.o.profile, this.o.design, this.settings);
-    void this.saveNow();
-    if (result === 'cancelled') return;
-    const o = overlay('overlay-dim');
-    const card = h('div', 'send-card', `<div class="sent"><div class="plane drop">${ICONS.download}</div><div class="ok">${ICONS.check}</div></div>`);
-    o.root.append(card);
-    const close = () => o.close();
-    o.root.addEventListener('click', close);
-    setTimeout(close, 2200);
+    // Der Benutzer legt den Dateinamen fest; gespeichert wird direkt aus dem Tipp auf ✓ (Teilen-Menü).
+    openSaveDialog({
+      defaultName: exportFileName(this.o.profile.name),
+      ext: 'svg',
+      onSave: async (fileName) => {
+        const result = await saveSvg(this.o.profile, this.o.design, this.settings, fileName);
+        void this.saveNow();
+        if (result === 'cancelled') return;
+        const o = overlay('overlay-dim');
+        const card = h('div', 'send-card', `<div class="sent"><div class="plane drop">${ICONS.download}</div><div class="ok">${ICONS.check}</div></div>`);
+        o.root.append(card);
+        const close = () => o.close();
+        o.root.addEventListener('click', close);
+        setTimeout(close, 2200);
+      },
+    });
   }
 }
