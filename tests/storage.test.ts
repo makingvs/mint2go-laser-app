@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { normalizeSettings, storage } from '../src/storage';
 import { DEFAULT_SETTINGS, createDesign, makeElement } from '../src/model';
 import { baseShape } from '../src/shapes';
-import { exportFileName, safeName, splitThemeName } from '../src/names';
+import { exportFileName, safeName } from '../src/names';
 import { buildZip } from '../src/exporter';
 import { crc32, makeZip } from '../src/zip';
 
@@ -42,17 +42,17 @@ describe('Speicher', () => {
     expect((await storage.getSettings()).plate).toEqual(DEFAULT_SETTINGS.plate);
   });
 
-  it('nimmt eigene SVG-Bilder an und lehnt Ungültiges ab', async () => {
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>';
-    await storage.addLibrarySvg('🐾 Tiere', 'Fuchs Kopf.svg', svg);
-    await expect(storage.addLibrarySvg('X', 'a', 'hallo')).rejects.toThrow();
-    await expect(storage.addLibrarySvg('X', 'a', '<svg><script>1</script></svg>')).rejects.toThrow();
-    const themes = await storage.listLibrary(); // fetch auf library/index.json schlägt in Node fehl -> nur eigene
-    const t = themes.find((x) => x.name === 'Tiere');
-    expect(t?.icon).toBe('🐾');
-    expect(t?.files[0].name).toBe('Fuchs_Kopf');
-    expect(await t!.files[0].load()).toBe(svg);
-    expect(t!.files[0].thumb.startsWith('data:image/svg+xml')).toBe(true);
+  it('löscht einen Benutzer samt Arbeiten (Tier-Symbol wird wieder frei)', async () => {
+    await storage.createProfile('Frosch', '🐸');
+    await storage.saveDesign('Frosch', { ...createDesign(), id: 'd-f1' });
+    await storage.saveDesign('Frosch', { ...createDesign(), id: 'd-f2' });
+    expect((await storage.listProfiles()).map((p) => p.icon)).toContain('🐸');
+    await storage.deleteProfile('Frosch');
+    expect((await storage.listProfiles()).map((p) => p.icon)).not.toContain('🐸');
+    expect(await storage.listDesigns('Frosch')).toEqual([]);
+    expect((await storage.listAllDesigns()).some((d) => d.profile === 'Frosch')).toBe(false);
+    // Neu anlegen mit demselben Symbol ist wieder möglich
+    expect((await storage.createProfile('Frosch', '🐸')).icon).toBe('🐸');
   });
 });
 
@@ -61,8 +61,6 @@ describe('Namen', () => {
     expect(exportFileName('Ana Lena!', new Date(2026, 9, 25, 8, 5, 9))).toBe('Ana_Lena_2026-10-25_08-05-09.svg');
     expect(safeName('../../x')).toBe('x');
     expect(safeName('')).toBe('Kind');
-    expect(splitThemeName('🐾 Tiere')).toEqual({ icon: '🐾', name: 'Tiere' });
-    expect(splitThemeName('Tiere')).toEqual({ icon: '🖼️', name: 'Tiere' });
   });
 });
 

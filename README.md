@@ -28,7 +28,7 @@ Die Oberfläche folgt dem Corporate Design von **MINT2Go – MINT erleben**: wei
 | Text | Schiefer (Tagline) | `#4D597C` bzw. `#2F3A5F` |
 
 - **Farben/Tokens:** `:root` in `src/style.css` (`--m-green`, `--m-orange` …). Farben für Schneiden/Gravieren/Fläche (Rot/Blau/Schwarz) bleiben bewusst unverändert – sie sind die Laserfarben der SVG.
-- **Schrift:** Jost (Variable, SIL Open Font License 1.1), über das Paket `@fontsource-variable/jost` mitgeliefert – funktioniert offline.
+- **Schrift:** Jost (Variable, SIL Open Font License 1.1), über das Paket `@fontsource-variable/jost` mitgeliefert – funktioniert offline. Weitere Schriften für Text: siehe „Text und Schriftarten“.
 - **Logo:** `public/mint2go-logo.png` (Startseite; langer Druck darauf öffnet den Lehrkraft-Bereich). Wird die Datei ersetzt, ändert sich das Logo überall.
 - **Zierelemente:** Zahnräder im Hintergrund und die Schaltkreis-Linie (grüner Punkt, orange/pinke Strecke, Ring) – `src/decor.ts`. Profilkarten wechseln die Akzentfarbe (Grün, Orange, Pink, Blau).
 - **App-Symbol:** drei Zahnräder in den CD-Farben, erzeugt mit `node scripts/make-icons.mjs`.
@@ -53,7 +53,6 @@ Die Pfade sind relativ (`base: './'`), die App funktioniert daher auch in einem 
 ### Vor dem Verteilen anpassen (einmalig am PC)
 
 - **`public/config.json`**: Standard-Plattengröße (mm), die drei Farben und die Mindestgröße für alle Geräte. Die Datei wird beim Bauen mitgeliefert (nach dem Bauen auch in `dist/config.json` änderbar).
-- **`Grafiken/<Thema>/*.svg`**: Bilder für das Bilder-Menü (siehe `Grafiken/LIES-MICH.txt`). Beim Bauen werden sie in die App gepackt und funktionieren offline.
 - Danach `npm run build` und `dist/` verteilen. Neue Version = gleiche Adresse neu bespielen. Die iPads laden sie beim nächsten Start mit Netz im Hintergrund; die App lädt sich dann beim nächsten Wechsel zur Galerie von selbst neu (nie mitten in einer Arbeit).
 
 ## Export der SVGs
@@ -67,7 +66,7 @@ Wichtig: Arbeiten liegen **nur auf dem jeweiligen iPad**. Wer Arbeiten dauerhaft
 
 ## Lehrkraft-Bereich
 
-**1,5 Sekunden lang** auf den freien Bereich in der Mitte der oberen Leiste (im Editor) bzw. auf das ✨ (Startseite) drücken. Dort: Plattengröße, die drei Farben, Mindestgröße (zu dünne Stellen bekommen ein Warndreieck), eigene SVG-Bilder hinzufügen, alle Arbeiten als ZIP exportieren. Die Einstellungen gelten **je Gerät**; „Standardwerte“ setzt auf `config.json` zurück.
+**1,5 Sekunden lang** auf den freien Bereich in der Mitte der oberen Leiste (im Editor) bzw. auf das ✨ (Startseite) drücken. Dort: Plattengröße, die drei Farben, Mindestgröße (zu dünne Stellen bekommen ein Warndreieck), alle Arbeiten als ZIP exportieren. Die Einstellungen gelten **je Gerät**; „Standardwerte“ setzt auf `config.json` zurück.
 
 ## Phase 0 – Vorab-Tests in xTool Creative Space (einmalig)
 
@@ -83,7 +82,7 @@ Beim Anlegen einer **neuen Arbeit** (Plus in der Galerie) wählen die Kinder zue
 - **Rechteck** – Breite und Höhe in mm (Vorgabe: Standardgröße aus dem Lehrkraft-Bereich bzw. `config.json`).
 - **Kreis / Oval** – beginnt als Kreis (Schloss), entsperrt ergibt Breite ≠ Höhe ein Oval.
 - **Dreieck, Stern, Herz** – feste Form, Größe per Zahlentastatur (Seitenverhältnis gesperrt).
-- **Eigene Form** – ein Umriss aus der SVG-Bibliothek (z. B. die Form des Rohlings: Tasse, Untersetzer, Brett …). Die Lehrkraft legt solche Umrisse als gefüllte SVG in `Grafiken\<Thema>` (oder im Lehrkraft-Bereich) ab.
+- **Eigene Form** – SVG-Datei oder Foto hochladen (z. B. der Umriss des Rohlings: Tasse, Untersetzer, Brett …); Fotos werden wie beim Bild-Upload in Umrisse umgewandelt.
 
 Die Zeichenfläche erscheint als Werkstück (Holzfarbe, Umriss, Gitter alle 10 mm) auf grauem Grund. Teile, die über das Werkstück hinausstehen, bekommen ein **rotes Warnzeichen** (nicht gesperrt, damit nichts verloren geht). Mit der Taste **Zeichenfläche** (gestrichelter Rahmen, oben links neben Wiederholen) lässt sich die Fläche später ändern; das ist nicht Teil von „Rückgängig“.
 
@@ -98,7 +97,7 @@ Ist ein Teil ausgewählt, zeigt die Leiste unter der Fläche **Breite**, **Höhe
 Die **Lupe** links öffnet die Bildersuche. Die Kinder tippen ein Wort (eigene Buchstabentasten, auch Umlaute) oder wählen ein Vorschlagsbild; die Treffer erscheinen als Vorschau, Antippen fügt das Bild als Form ein (Schere/Stift/Farbrolle wie bei allen Formen). Das gewählte Bild wird in der Arbeit gespeichert und funktioniert danach offline; nur die Suche selbst braucht Internet.
 
 - **Quelle:** [Iconify](https://iconify.design) (offene Schnittstelle `api.iconify.design`, Suche + SVG-Abruf, Lizenz je Sammlung). SVG Repo wurde geprüft und scheidet aus: keine dokumentierte API, automatische Abrufe werden mit einer Bot-Prüfung (HTTP 429) abgewiesen.
-- **Erlaubte Sammlungen** (kinderfreundlich, freie Lizenzen): Fluent Emoji High Contrast (MIT, Microsoft, einfarbig, am besten zum Gravieren), Noto Emoji (Apache 2.0, Google), Fluent Emoji Flat (MIT, Microsoft). Änderbar in `public/config.json` unter `onlineSearch.sets`; `"enabled": false` schaltet die Suche ab (z. B. ohne Internet).
+- **Erlaubte Sammlungen** (nur mit eindeutiger Lizenz): Fluent Emoji High Contrast (einfarbig, am besten zum Gravieren) und Fluent Emoji Flat, beide MIT-Lizenz, © Microsoft Corporation. Noto Emoji ist bewusst ausgeschlossen (widersprüchliche Lizenzangaben, siehe `THIRD-PARTY-NOTICES.md`). Änderbar in `public/config.json` unter `onlineSearch.sets`; `"enabled": false` schaltet die Suche ab (z. B. ohne Internet).
 - **Deutsch → Englisch:** Die Sammlungen sind englisch benannt, deshalb übersetzt die App rund 300 Kinderwörter (Katze → cat, auch Mehrzahl). Unbekannte Wörter werden unverändert gesucht (Englisch geht also auch).
 - **Kindersicherung:** Ungeeignete Begriffe werden in Suche und Ergebnissen gesperrt (Liste in `src/online.ts`). Das ist ein Filter, keine Garantie – die Lehrkraft bleibt in der Verantwortung.
 - **Aussehen:** Farbige Bilder werden zur einfarbigen Silhouette (weiße Flächen gelten als Hintergrund, Überlappungen werden vereint); die Vorschau zeigt deshalb schon die Silhouette.
@@ -106,7 +105,7 @@ Die **Lupe** links öffnet die Bildersuche. Die Kinder tippen ein Wort (eigene B
 
 ## Bedienung für Kinder
 
-- Links: Formen, Bilder, Bildersuche (Lupe), Text, Zeichnen. Rechts: Schere (schneiden), Stift (gravieren), Farbrolle (Fläche gravieren).
+- Links, in drei Gruppen: **grün** = Formen (öffnet eine Auswahl mit 29 vorgefertigten Formen in drei Gruppen) und direkt darunter Freihandzeichnen; **blau** = Bild hochladen, SVG hochladen, Bildersuche (Lupe); **pink** = Text. Rechts: Schere (schneiden), Stift (gravieren), Farbrolle (Fläche gravieren).
 - Antippen wählt ein Teil aus: mit dem Finger verschieben, Eckpunkte ziehen = Größe, blauer Kreis = drehen (rastet bei 15°), zwei Finger = Größe + Drehen.
 - Oben: Galerie, Rückgängig, Wiederholen, Kopieren, Löschen (mit Bestätigung), **Exportieren** (grün).
 - Arbeiten werden automatisch gespeichert. Ein rotes Wolken-Symbol oben heißt: Speichern klappt nicht (z. B. privater Modus).
@@ -116,17 +115,48 @@ Die **Lupe** links öffnet die Bildersuche. Die Kinder tippen ein Wort (eigene B
 ```bash
 npm install
 npm test          # Vitest: Geometrie, Export, Import, Speicher, ZIP, Suche, Server
-npm run build     # Typprüfung + Bilder-Bibliothek + Build nach dist/ + Service Worker
+npm run build     # Typprüfung + Build nach dist/ + Service Worker
 npm run dev       # Vite-Entwicklungsserver (Port 5173)
 npm run preview   # gebaute App lokal ansehen
 node scripts/make-icons.mjs   # App-Symbol neu erzeugen
 ```
 
-Technik: TypeScript + Vite, keine Laufzeit-Bibliotheken. Vereinigung überlappender Formen, Glättung, Blockschrift (Großbuchstaben, Ä Ö Ü, Ziffern, `. ! ? -`), SVG-Import und ZIP-Schreiber sind selbst geschrieben; die 13 eingebauten Grafiken sind selbst gezeichnet (keine Lizenzfragen). Speicher: IndexedDB (`src/storage.ts`); Löschen verschiebt in einen Papierkorb-Speicher.
+Technik: TypeScript + Vite, keine Laufzeit-Bibliotheken. Vereinigung überlappender Formen, Glättung, Blockschrift (Großbuchstaben, Ä Ö Ü, Ziffern, `. ! ? -`), SVG-Import und ZIP-Schreiber sind selbst geschrieben; es gibt keine vorgefertigten Bilder mehr. Speicher: IndexedDB (`src/storage.ts`); Löschen verschiebt in einen Papierkorb-Speicher.
 
-## Offene SVG-Bibliothek
+## Beschriftung der Tasten und vorgefertigte Formen
 
-Bilder-Menü = 13 eingebaute Motive + Reiter aus `Grafiken\<Thema>\*.svg` (beim Bauen eingepackt) + eigene Bilder, die im Lehrkraft-Bereich auf dem Gerät hinzugefügt wurden. Geeignet sind Silhouetten/Umrisse aus gefüllten Formen; Überlappungen werden vereint, Löcher bleiben Löcher, weiße Füllungen gelten als Hintergrund. Text, Bilder, Verläufe, `<use>` und Masken werden übersprungen; Dateien mit Skripten oder über 2 MB werden abgelehnt. Nur Bilder verwenden, deren Lizenz das erlaubt (z. B. CC0).
+Alle Werkzeugtasten haben die **Schrift unter dem Symbol** (Galerie, Zurück, Vor, Fläche, Kopie, Löschen, Export; Formen, Freihand, Bild, SVG, Suche, Text; Schneiden, Gravieren, Füllen; Größer, Kleiner, Alles). Die Formen-Auswahl enthält 29 Formen:
+
+- **Grundformen:** Kreis, Oval, Quadrat, Rechteck, abgerundetes Quadrat, Dreieck, Fünfeck, Sechseck, Achteck, Raute, Trapez, Parallelogramm, Halbkreis, Viertelkreis
+- **Sterne & Herzen:** Stern, Sechsstern, Zackenstern, Herz, Blume
+- **Zeichen:** Pfeil, Kreuz, Blitz, Mond, Wolke, Tropfen, Sprechblase, Haus, Ring, Rahmen (Ring und Rahmen haben ein Loch, das beim Schneiden mit ausgeschnitten wird)
+
+Neue Formen: in `src/shapes.ts` ergänzen (ID, Gruppe, Name, Geometrie); Symbol und Auswahl entstehen automatisch, `tests/shapes.test.ts` prüft sie.
+
+## Text und Schriftarten
+
+Die Text-Taste (pink) öffnet eine Eingabe mit Buchstabentasten (Umlaute, ß, Ziffern, Satzzeichen; **Pfeil-Taste** = Groß/Klein) und einer Reihe **Schriftmuster „Abc“** zum Antippen. Zur Wahl stehen acht Schriften: **Block** (eigene Strichschrift, Vektor), Jost, Fredoka, Baloo 2, Rubik Mono One, Bangers, Caveat und Pacifico. Der Text wird mit der gewählten Schrift gezeichnet, in Umrisse umgewandelt (`src/fonts.ts`, `src/trace.ts`) und wie jede Form eingefügt (Schere/Stift/Farbrolle, Größe/Drehen, Export als Pfad). Zu dünne Stellen bekommen das Warndreieck.
+
+## Lizenzen
+
+Alle mitgelieferten Schriften stehen unter der **SIL Open Font License 1.1**; Urheberhinweise und Lizenztexte liegen in `public/licenses/` und werden mit der App ausgeliefert. Die Bilder der Suche sind MIT-lizenziert (Microsoft Fluent Emoji). In der App zeigt das **Info-Symbol** unten links auf der Startseite die Seite „Lizenzen & Quellen“ mit allen Hinweisen und den Lizenztexten. Gesamtübersicht und Regeln fürs Erweitern: [`THIRD-PARTY-NOTICES.md`](THIRD-PARTY-NOTICES.md). Ein Test (`tests/licenses.test.ts`) stellt sicher, dass jede Schrift und jede freigeschaltete Bildersammlung einen Lizenztext und Urheberhinweis hat.
+
+## Bilder hochladen
+
+Links in der Leiste gibt es zwei Tasten (die vorgefertigten Bilder und der Bilder-Knopf wurden entfernt):
+
+- **Bild hochladen** (Bild mit Pfeil): ein Foto oder Bild aus Fotos/Dateien/Kamera wählen. Es öffnet sich die **Umwandlung in Vektor**: links das Original, rechts das Ergebnis als Schwarz-Weiß-Umriss. Mit dem **Schieberegler** wird die Helligkeitsgrenze eingestellt, mit dem **Kontrast-Knopf** hell/dunkel vertauscht (die App rät das automatisch: der kleinere Teil des Bildes ist der Vordergrund). Mit ✓ wird das Ergebnis als Form eingefügt (Schere/Stift/Farbrolle, Größe, Drehen wie bei allen Formen) und beim Exportieren Teil der SVG.
+- **SVG hochladen** (Dokument mit Pfeil): eine SVG-Datei wählen. Überlappende Formen werden vereint, Löcher bleiben Löcher, weiße Füllungen gelten als Hintergrund. Text, eingebettete Bilder, Verläufe, `<use>` und Masken werden übersprungen; Dateien über 2 MB werden abgelehnt. Nur Dateien verwenden, deren Lizenz das erlaubt.
+
+Technik der Umwandlung: `src/trace.ts` (Graustufen, Otsu-Schwellwert, Marching Squares, Glätten, Vereinfachen; Flecken unter 0,02 % der Bildfläche werden ignoriert), Oberfläche `src/imageDialog.ts`. Bilder werden auf höchstens 512 Pixel Kantenlänge verkleinert. Es werden nur die Umrisse (Zweifarbigkeit) erkannt – keine Farben, keine Verläufe.
+
+## Benutzer
+
+Beim Anlegen eines neuen Benutzers sind **Tier-Symbole, die schon vergeben sind, gesperrt** (ausgegraut). Auch ein bereits vorhandener Name wird abgelehnt. Ein Symbol wird erst wieder frei, wenn der Benutzer **gelöscht** wurde: In der Galerie des Benutzers die rosa **Mülleimer-Taste** oben rechts antippen und bestätigen. Seine Arbeiten werden dabei nicht endgültig vernichtet, sondern in den Papierkorb-Speicher des Geräts verschoben (nicht mehr in der App sichtbar).
+
+## Zoom
+
+Rechts unter den Werkzeugen: **＋** vergrößert, **－** verkleinert (stufenweise ×1,5, bis 800 %), die Taste mit dem Rahmen zeigt wieder die **ganze Arbeitsfläche**. Die Prozentzahl steht darunter. Die Maße in mm ändern sich dabei nicht – nur der Ausschnitt. Im vergrößerten Zustand lässt sich der Ausschnitt verschieben, indem man auf eine **leere Stelle** der Fläche tippt und zieht. Ein ausgewähltes Teil wird beim Vergrößern in die Mitte genommen. Zwei Finger auf der Fläche zoomen nicht, sondern skalieren/drehen wie bisher das ausgewählte Teil.
 
 ## Lokaler Server (optional)
 

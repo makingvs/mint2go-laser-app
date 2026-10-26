@@ -16,7 +16,7 @@ for (const ev of ['gesturestart', 'gesturechange', 'gestureend', 'contextmenu', 
 document.addEventListener(
   'touchmove',
   (e) => {
-    if (!(e.target as HTMLElement).closest('.pick-grid, .tform, .card-grid, .keys, .left-rail')) e.preventDefault();
+    if (!(e.target as HTMLElement).closest('.pick-grid, .tform, .card-grid, .keys, .left-rail, .font-row')) e.preventDefault();
   },
   { passive: false },
 );

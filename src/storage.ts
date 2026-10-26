@@ -2,7 +2,7 @@
 // läuft die App mit einem Speicher im Arbeitsspeicher weiter, dann gehen Arbeiten beim
 // Schließen verloren – die Oberfläche zeigt das über `storage.persistent` an.
 import { DEFAULT_SETTINGS, type Design, type Settings } from './model';
-import { safeName, splitThemeName } from './names';
+import { safeName } from './names';
 import { normalizeSearchConfig, type SearchConfig } from './online';
 
 export interface Profile {
@@ -13,32 +13,15 @@ export interface Profile {
 
 export type StoredDesign = Design & { profile: string };
 
-export interface LibFile {
-  key: string;
-  name: string;
-  /** URL oder data:-URL für die Vorschau (<img>) */
-  thumb: string;
-  load(): Promise<string>;
-}
-
-export interface LibTheme {
-  id: string;
-  icon: string;
-  name: string;
-  files: LibFile[];
-}
-
-type StoreName = 'profiles' | 'designs' | 'trash' | 'settings' | 'library';
-const KEY: Record<StoreName, string> = { profiles: 'id', designs: 'id', trash: 'key', settings: 'key', library: 'id' };
+type StoreName = 'profiles' | 'designs' | 'trash' | 'settings';
+const KEY: Record<StoreName, string> = { profiles: 'id', designs: 'id', trash: 'key', settings: 'key' };
 const STORES = Object.keys(KEY) as StoreName[];
-const MAX_SVG = 2 * 1024 * 1024;
 
 const memory: Record<StoreName, Map<string, unknown>> = {
   profiles: new Map(),
   designs: new Map(),
   trash: new Map(),
   settings: new Map(),
-  library: new Map(),
 };
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
@@ -142,18 +125,6 @@ function loadConfig(): Promise<unknown> {
 }
 const loadDefaults = (): Promise<Settings> => loadConfig().then((j) => normalizeSettings(j));
 
-interface BundledIndex {
-  themes: { id: string; icon: string; name: string; files: { path: string; name: string }[] }[];
-}
-interface CustomSvg {
-  id: string;
-  theme: string;
-  name: string;
-  svg: string;
-}
-
-const dataUrl = (svg: string) => `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-
 export const storage = {
   /** false = nur Arbeitsspeicher, Arbeiten gehen beim Schließen verloren */
   get persistent(): boolean {
@@ -191,6 +162,14 @@ export const storage = {
     return loadDefaults();
   },
 
+  /** Benutzer samt Arbeiten entfernen (Arbeiten wandern in den Papierkorb-Speicher). Das Tier-Symbol wird dadurch wieder frei. */
+  async deleteProfile(id: string): Promise<void> {
+    for (const d of await getAll<StoredDesign>('designs')) {
+      if (d.profile === id) await this.deleteDesign(id, d.id);
+    }
+    await remove('profiles', id);
+  },
+
   async listProfiles(): Promise<Profile[]> {
     const list = await getAll<Profile>('profiles');
     return list.sort((a, b) => a.name.localeCompare(b.name, 'de'));
@@ -223,45 +202,4 @@ export const storage = {
     }
   },
 
-  /** Mitgelieferte Bibliothek (library/index.json) plus am Gerät hinzugefügte SVGs. */
-  async listLibrary(): Promise<LibTheme[]> {
-    const themes: LibTheme[] = [];
-    try {
-      const res = await fetch('library/index.json', { cache: 'no-cache' });
-      if (res.ok) {
-        const idx = (await res.json()) as BundledIndex;
-        for (const t of idx.themes) {
-          themes.push({
-            id: t.id,
-            icon: t.icon,
-            name: t.name,
-            files: t.files.map((f) => {
-              const url = `library/${f.path}`;
-              return { key: `b:${f.path}`, name: f.name, thumb: url, load: async () => (await fetch(url)).text() };
-            }),
-          });
-        }
-      }
-    } catch {
-      /* keine mitgelieferte Bibliothek */
-    }
-    const custom = (await getAll<CustomSvg>('library')).sort((a, b) => a.name.localeCompare(b.name, 'de'));
-    for (const c of custom) {
-      const { icon, name } = splitThemeName(c.theme);
-      let theme = themes.find((t) => t.name === name);
-      if (!theme) {
-        theme = { id: c.theme, icon, name, files: [] };
-        themes.push(theme);
-      }
-      theme.files.push({ key: `c:${c.id}`, name: c.name, thumb: dataUrl(c.svg), load: async () => c.svg });
-    }
-    return themes.filter((t) => t.files.length);
-  },
-  async addLibrarySvg(theme: string, name: string, svg: string): Promise<void> {
-    if (svg.length > MAX_SVG) throw new Error('zu groß');
-    if (!/<svg[\s>]/.test(svg.slice(0, 4000))) throw new Error('kein SVG');
-    if (/<script/i.test(svg)) throw new Error('Skripte nicht erlaubt');
-    const base = safeName(name.replace(/\.svg$/i, ''), 'bild');
-    await put('library', { id: `${safeName(theme, 'Eigene')}/${base}`, theme: theme.trim() || 'Eigene', name: base, svg } satisfies CustomSvg);
-  },
 };

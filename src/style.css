@@ -1392,3 +1392,413 @@ input {
 .thumb {
   background: #f1dcb9;
 }
+
+/* ---------- Zoom ---------- */
+.zoom-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 4px solid transparent;
+  border-image: linear-gradient(90deg, var(--m-green), var(--m-orange), var(--m-pink)) 1;
+}
+.btn.zoom {
+  width: 60px;
+  height: 56px;
+  border-radius: 18px;
+}
+.btn.zoom .icon {
+  width: 52%;
+  height: 52%;
+}
+.zoom-label {
+  height: 20px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.right-rail {
+  gap: 14px;
+}
+.btn.op {
+  width: 80px;
+  height: 80px;
+}
+
+/* ---------- Benutzer: bereits vergebene Tiere ---------- */
+.pick-item.used {
+  opacity: 0.28;
+  filter: grayscale(1);
+  cursor: not-allowed;
+}
+.pick-item.used:active {
+  background: #faf6ec;
+}
+
+/* ---------- Bild umwandeln ---------- */
+.trace-panel {
+  width: min(900px, 100%);
+}
+.trace-views {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.trace-view {
+  height: min(46vh, 360px);
+  border-radius: 20px;
+  background: repeating-conic-gradient(#f3f6fb 0% 25%, #fff 0% 50%) 50% / 24px 24px;
+  box-shadow: 0 0 0 2px var(--line) inset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  overflow: hidden;
+}
+.trace-view img,
+.trace-view svg {
+  max-width: 100%;
+  max-height: 100%;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.trace-controls {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.trace-end {
+  font-size: 30px;
+  color: var(--muted);
+}
+.trace-slider {
+  flex: 1;
+  height: 44px;
+  accent-color: var(--m-blue);
+  cursor: pointer;
+}
+
+/* =====================================================================
+   Schriften für Text (alle SIL OFL 1.1, Lizenztexte in public/licenses/)
+   ===================================================================== */
+@font-face {
+  font-family: 'Fredoka Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 300 700;
+  src: url('../node_modules/@fontsource-variable/fredoka/files/fredoka-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122;
+}
+@font-face {
+  font-family: 'Baloo 2 Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 800;
+  src: url('../node_modules/@fontsource-variable/baloo-2/files/baloo-2-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122;
+}
+@font-face {
+  font-family: 'Caveat Variable';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400 700;
+  src: url('../node_modules/@fontsource-variable/caveat/files/caveat-latin-wght-normal.woff2') format('woff2-variations');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122;
+}
+@font-face {
+  font-family: 'Rubik Mono One';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../node_modules/@fontsource/rubik-mono-one/files/rubik-mono-one-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122;
+}
+@font-face {
+  font-family: 'Bangers';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../node_modules/@fontsource/bangers/files/bangers-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122;
+}
+@font-face {
+  font-family: 'Pacifico';
+  font-style: normal;
+  font-display: swap;
+  font-weight: 400;
+  src: url('../node_modules/@fontsource/pacifico/files/pacifico-latin-400-normal.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122;
+}
+
+/* ---------- Linke Leiste: Gruppen ---------- */
+.left-rail {
+  gap: 12px;
+  padding: 2px 4px 8px 2px;
+}
+.rail-group {
+  --g: var(--m-green);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 8px 8px;
+  border-radius: 24px;
+  background: var(--soft);
+  border-top: 6px solid var(--g);
+  flex: none;
+}
+.rail-group .btn.tool {
+  box-shadow: 0 0 0 2px var(--line) inset;
+}
+.rail-group .btn.tool.active {
+  box-shadow: 0 0 0 3px var(--m-blue) inset;
+}
+.left-rail .rail-sep {
+  display: none;
+}
+
+/* Formen-Auswahl */
+.overlay-clear {
+  background: transparent;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding: 0;
+}
+.flyout {
+  position: fixed;
+  display: grid;
+  grid-template-columns: repeat(3, 76px);
+  gap: 10px;
+  padding: 14px;
+  background: #fff;
+  border-radius: 26px;
+  box-shadow: 0 0 0 2px var(--line), 0 16px 40px rgba(47, 58, 95, 0.3);
+  animation: pop 0.15s;
+}
+.flyout .btn {
+  width: 76px;
+  height: 76px;
+}
+
+/* Schriftwahl */
+.font-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 2px;
+  scrollbar-width: none;
+}
+.font-row::-webkit-scrollbar {
+  display: none;
+}
+.font-chip {
+  flex: none;
+  min-width: 108px;
+  height: 64px;
+  padding: 0 14px;
+  border-radius: 18px;
+  background: var(--soft);
+  box-shadow: 0 0 0 2px var(--line) inset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+  line-height: 1;
+}
+.font-chip svg {
+  height: 34px;
+  width: 80px;
+}
+.font-chip.active {
+  background: var(--blue-tint);
+  box-shadow: 0 0 0 3px var(--m-blue) inset;
+}
+.font-preview {
+  white-space: nowrap;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.key.shift.active {
+  background: var(--blue-tint);
+  color: var(--blue-ink);
+  box-shadow: 0 0 0 3px var(--m-blue) inset;
+}
+
+/* Lizenzen */
+.info-btn {
+  position: absolute !important;
+  left: calc(var(--safe-l) + 20px);
+  bottom: calc(var(--safe-b) + 20px);
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  color: var(--muted);
+  z-index: 3;
+}
+.lic-panel {
+  width: min(760px, 100%);
+  height: min(720px, 100%);
+}
+.lic-body h3 {
+  margin: 14px 0 0;
+  font-size: 22px;
+  color: var(--ink);
+}
+.lic-card {
+  border-radius: 18px;
+  background: var(--soft);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.lic-title {
+  font-size: 30px;
+  line-height: 1.15;
+}
+.lic-meta {
+  font-size: 16px;
+  color: var(--muted);
+}
+.lic-url {
+  font-size: 14px;
+  color: var(--m-ink);
+  word-break: break-all;
+  user-select: text;
+}
+.lic-text {
+  margin: 4px 0 0;
+  padding: 12px;
+  max-height: 240px;
+  overflow: auto;
+  width: 100%;
+  background: #fff;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* =====================================================================
+   Beschriftete Werkzeugtasten: Symbol oben, Schrift darunter
+   ===================================================================== */
+.btn.labeled {
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  width: auto;
+  min-width: 72px;
+  height: 78px;
+  padding: 6px 8px 5px;
+}
+.btn.labeled .ico {
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn.labeled .ico .icon {
+  width: 100%;
+  height: 100%;
+}
+.btn .lbl {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: 0.1px;
+  color: var(--m-ink);
+  white-space: nowrap;
+}
+.btn.danger .lbl {
+  color: var(--m-pink);
+}
+.btn.send .lbl {
+  color: #fff;
+}
+.btn.send.labeled {
+  min-width: 96px;
+}
+.btn.labeled:disabled .lbl {
+  color: var(--muted);
+}
+.topbar {
+  height: 98px;
+}
+.top-group {
+  gap: 8px;
+}
+.left-rail .btn.labeled.tool {
+  width: 78px;
+  min-width: 78px;
+}
+.btn.op.labeled {
+  width: 92px;
+  height: 100px;
+  border-radius: 26px;
+  gap: 4px;
+}
+.btn.op.labeled .ico {
+  width: 46px;
+  height: 46px;
+}
+.btn.op .lbl {
+  color: var(--ink);
+  font-size: 14.5px;
+}
+.btn.zoom.labeled {
+  width: 78px;
+  min-width: 78px;
+  height: 66px;
+  gap: 1px;
+  padding: 5px 6px 3px;
+}
+.btn.zoom.labeled .ico {
+  width: 26px;
+  height: 26px;
+}
+.btn.zoom .lbl {
+  font-size: 12.5px;
+}
+.right-rail {
+  width: 104px;
+  gap: 10px;
+}
+.zoom-box {
+  gap: 6px;
+  padding-top: 10px;
+}
+
+/* Formen-Auswahl: drei Gruppen, mehr Formen */
+.flyout {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  grid-template-columns: none;
+  max-height: calc(100vh - 20px);
+  overflow-y: auto;
+  padding: 14px;
+}
+.fly-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 64px);
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 3px solid transparent;
+  border-image: linear-gradient(90deg, var(--m-green), var(--m-orange), var(--m-pink)) 1;
+}
+.fly-grid:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.flyout .btn {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+}

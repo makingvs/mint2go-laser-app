@@ -16,6 +16,11 @@ export function button(cls: string, html: string, onTap: (ev: PointerEvent | Mou
   return b;
 }
 
+/** Symbol mit Beschriftung darunter (für Werkzeugtasten). */
+export function lab(iconHtml: string, text: string): string {
+  return `<span class="ico">${iconHtml}</span><span class="lbl">${text}</span>`;
+}
+
 /** Overlay über der ganzen Seite. close() entfernt es wieder. */
 export function overlay(cls = ''): { root: HTMLDivElement; close: () => void } {
   const root = h('div', `overlay ${cls}`);

@@ -1,17 +1,18 @@
 // Die Arbeitsfläche: Formen setzen, verschieben, drehen, skalieren, zeichnen, exportieren.
-import { storage, type LibFile, type Profile } from './storage';
+import { storage, type Profile } from './storage';
+import { openTraceDialog } from './imageDialog';
 import { saveSvg } from './exporter';
 import { svgToShape } from './svgImport';
-import { bbox, dist, resample, shapeToPath, simplify, smooth, transformPoint, type Pt, type Ring } from './geometry';
-import { GRAPHICS, THEMES, graphicShape } from './graphics';
+import { bbox, dist, resample, shapeToPath, simplify, smooth, transformPoint, type Pt, type Ring, type Shape } from './geometry';
 import { ICONS, SHAPE_ICONS } from './icons';
 import { History, isTooThin, makeElement, newId, pickElement, type Design, type El, type Op, type Settings, type Surface, worldShape } from './model';
 import { canvasBackground, elementMarkup } from './render';
-import { defaultSurface, isFree, isOutside, surfaceKey, surfaceSize, viewFor, type View } from './surface';
+import { MAX_ZOOM, defaultSurface, isFree, isOutside, surfaceKey, surfaceSize, viewFor, zoomedView, type View } from './surface';
 import { openSurfaceDialog } from './surfaceDialog';
-import { SHAPE_IDS, baseShape, type ShapeId } from './shapes';
-import { GLYPH_HEIGHT, SUPPORTED_CHARS, normalizeText, textShape } from './text';
-import { button, confirmDialog, h, onLongPress, overlay } from './dom';
+import { SHAPE_GROUPS, SHAPE_LABELS, baseShape, type ShapeId } from './shapes';
+import { GLYPH_HEIGHT, normalizeText, textShape } from './text';
+import { FONTS, fontStyle, fontTextShape, type FontChoice } from './fonts';
+import { button, confirmDialog, h, lab, onLongPress, overlay } from './dom';
 import { openTeacher } from './teacher';
 import { cdLineMarkup } from './decor';
 import { formatNumber, openNumpad } from './numpad';
@@ -30,11 +31,12 @@ type Gesture =
   | { t: 'scale'; id: string; c: Pt; d0: number; w0: number; h0: number }
   | { t: 'rotate'; id: string; c: Pt; a0: number; rot0: number }
   | { t: 'pinch'; id: string; d0: number; a0: number; m0: Pt; w0: number; h0: number; rot0: number; x0: number; y0: number }
-  | { t: 'draw'; pts: Pt[] };
+  | { t: 'draw'; pts: Pt[] }
+  | { t: 'pan'; sx: number; sy: number; c0: Pt; k0: number };
 
 const OP_ICON: Record<Op, string> = { cut: ICONS.scissors, engrave: ICONS.pen, fill: ICONS.roller };
 const OP_LABEL: Record<Op, string> = { cut: 'Schneiden', engrave: 'Gravieren', fill: 'Fläche gravieren' };
-const MAX_TEXT = 14;
+const OP_SHORT: Record<Op, string> = { cut: 'Schneiden', engrave: 'Gravieren', fill: 'Füllen' };
 
 export class Editor {
   readonly root = h('div', 'editor');
@@ -50,6 +52,9 @@ export class Editor {
   private thinCache = new Map<string, boolean>();
   private outsideCache = new Map<string, boolean>();
   private view!: View;
+  private zoom = 1;
+  private zoomCenter: Pt | null = null;
+  private zoomLabel!: HTMLElement;
   private saveTimer = 0;
   private dirty = false;
   private everSaved: boolean;
@@ -114,10 +119,10 @@ export class Editor {
   private build(): void {
     const top = h('div', 'topbar');
     const left = h('div', 'top-group');
-    this.btn.gallery = button('btn', ICONS.gallery, () => void this.exit(), 'Galerie');
-    this.btn.undo = button('btn big', ICONS.undo, () => this.undo(), 'Rückgängig');
-    this.btn.redo = button('btn', ICONS.redo, () => this.redo(), 'Wiederholen');
-    this.btn.surface = button('btn', ICONS.canvas, () => this.changeSurface(), 'Zeichenfläche');
+    this.btn.gallery = button('btn labeled', lab(ICONS.gallery, 'Galerie'), () => void this.exit(), 'Galerie');
+    this.btn.undo = button('btn labeled', lab(ICONS.undo, 'Zurück'), () => this.undo(), 'Rückgängig');
+    this.btn.redo = button('btn labeled', lab(ICONS.redo, 'Vor'), () => this.redo(), 'Wiederholen');
+    this.btn.surface = button('btn labeled', lab(ICONS.canvas, 'Fläche'), () => this.changeSurface(), 'Zeichenfläche');
     left.append(this.btn.gallery, this.btn.undo, this.btn.redo, this.btn.surface);
 
     const center = h('div', 'top-center');
@@ -134,26 +139,52 @@ export class Editor {
     );
 
     const right = h('div', 'top-group');
-    this.btn.dup = button('btn', ICONS.copy, () => this.duplicate(), 'Kopieren');
-    this.btn.del = button('btn danger', ICONS.trash, () => void this.remove(), 'Löschen');
-    this.btn.export = button('btn send', ICONS.download, () => void this.exportNow(), 'Exportieren');
+    this.btn.dup = button('btn labeled', lab(ICONS.copy, 'Kopie'), () => this.duplicate(), 'Kopieren');
+    this.btn.del = button('btn labeled danger', lab(ICONS.trash, 'Löschen'), () => void this.remove(), 'Löschen');
+    this.btn.export = button('btn labeled send', lab(ICONS.download, 'Export'), () => void this.exportNow(), 'Exportieren');
     right.append(this.btn.dup, this.btn.del, this.btn.export);
     top.append(left, center, right, h('div', 'cd-wrap top-line', cdLineMarkup()));
 
     const body = h('div', 'editor-body');
     const rail = h('div', 'rail left-rail');
-    for (const id of SHAPE_IDS) rail.append(button('btn tool', SHAPE_ICONS[id], () => this.addShape(id), id));
-    rail.append(h('div', 'rail-sep'));
-    rail.append(button('btn tool', ICONS.picture, () => this.openGraphics(), 'Bilder'));
-    this.btn.search = button('btn tool', ICONS.search, () => this.openSearch(), 'Suchen');
+    const group = (accent: string, ...items: HTMLElement[]): HTMLElement => {
+      const g = h('div', 'rail-group');
+      g.style.setProperty('--g', accent);
+      g.append(...items);
+      return g;
+    };
+    const pickFile = (accept: string, onFile: (f: File) => void): HTMLInputElement => {
+      const input = h('input');
+      input.type = 'file';
+      input.accept = accept;
+      input.hidden = true;
+      input.addEventListener('change', () => {
+        const f = input.files?.[0];
+        input.value = '';
+        if (f) onFile(f);
+      });
+      this.root.append(input);
+      return input;
+    };
+    // Gruppe 1: Formen (alle in einer Auswahl) und Freihand direkt darunter
+    this.btn.shapes = button('btn labeled tool', lab(ICONS.shapes, 'Formen'), () => this.openShapes(), 'Formen');
+    this.btn.draw = button('btn labeled tool', lab(ICONS.draw, 'Freihand'), () => this.toggleDraw(), 'Zeichnen');
+    // Gruppe 2: Bilder (hochladen, SVG, Suche im Internet)
+    const imageInput = pickFile('image/*', (f) => void this.importImage(f));
+    const svgInput = pickFile('.svg,image/svg+xml', (f) => void this.importSvg(f));
+    this.btn.image = button('btn labeled tool', lab(ICONS.imageUp, 'Bild'), () => imageInput.click(), 'Bild hochladen');
+    this.btn.svgfile = button('btn labeled tool', lab(ICONS.svgUp, 'SVG'), () => svgInput.click(), 'SVG hochladen');
+    this.btn.search = button('btn labeled tool', lab(ICONS.search, 'Suche'), () => this.openSearch(), 'Suchen');
     this.btn.search.hidden = true;
     void storage.getSearchConfig().then((c) => {
       this.btn.search.hidden = !c.enabled;
     });
-    rail.append(this.btn.search);
-    rail.append(button('btn tool', ICONS.text, () => this.openText(), 'Text'));
-    this.btn.draw = button('btn tool', ICONS.draw, () => this.toggleDraw(), 'Zeichnen');
-    rail.append(this.btn.draw);
+    // Gruppe 3: Text
+    rail.append(
+      group('var(--m-green)', this.btn.shapes, this.btn.draw),
+      group('var(--m-blue)', this.btn.image, this.btn.svgfile, this.btn.search),
+      group('var(--m-pink)', button('btn labeled tool', lab(ICONS.text, 'Text'), () => this.openText(), 'Text')),
+    );
 
     this.stage = h('div', 'stage');
     this.svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
@@ -168,10 +199,17 @@ export class Editor {
 
     const opRail = h('div', 'rail right-rail');
     for (const op of ['cut', 'engrave', 'fill'] as Op[]) {
-      const b = button(`btn op op-${op}`, OP_ICON[op], () => this.setOp(op), OP_LABEL[op]);
+      const b = button(`btn labeled op op-${op}`, lab(OP_ICON[op], OP_SHORT[op]), () => this.setOp(op), OP_LABEL[op]);
       this.btn[`op-${op}`] = b;
       opRail.append(b);
     }
+    const zoomBox = h('div', 'zoom-box');
+    this.btn.zoomIn = button('btn labeled zoom', lab(ICONS.plus, 'Größer'), () => this.zoomBy(1.5), 'Vergrößern');
+    this.btn.zoomOut = button('btn labeled zoom', lab(ICONS.minus, 'Kleiner'), () => this.zoomBy(1 / 1.5), 'Verkleinern');
+    this.btn.zoomFit = button('btn labeled zoom', lab(ICONS.fit, 'Alles'), () => this.zoomFit(), 'Ganze Fläche');
+    this.zoomLabel = h('div', 'zoom-label');
+    zoomBox.append(this.btn.zoomIn, this.btn.zoomOut, this.btn.zoomFit, this.zoomLabel);
+    opRail.append(zoomBox);
     body.append(rail, this.stage, opRail);
     this.root.append(top, body);
   }
@@ -231,9 +269,66 @@ export class Editor {
     this.commit();
   }
 
+  /** Sichtbarer Ausschnitt: ganze Fläche oder herangezoomt (Maße in mm bleiben unverändert). */
+  private effView(): View {
+    return zoomedView(this.view, this.zoom, this.zoomCenter);
+  }
+
   private setViewBox(): void {
-    const v = this.view;
+    const v = this.effView();
     this.svg.setAttribute('viewBox', `${v.x} ${v.y} ${v.w} ${v.h}`);
+  }
+
+  /** Zoom um den Faktor f; Mitte = ausgewähltes Teil, sonst der aktuelle Ausschnitt. */
+  private zoomBy(f: number): void {
+    const cur = this.effView();
+    const sel = this.selected;
+    const c: Pt = sel ? [sel.x, sel.y] : [cur.x + cur.w / 2, cur.y + cur.h / 2];
+    this.zoom = Math.min(MAX_ZOOM, Math.max(1, this.zoom * f));
+    if (this.zoom < 1.01) this.zoomFit();
+    else {
+      this.zoomCenter = c;
+      this.render();
+    }
+  }
+
+  /** Wieder die ganze Arbeitsfläche zeigen. */
+  private zoomFit(): void {
+    this.zoom = 1;
+    this.zoomCenter = null;
+    this.render();
+  }
+
+  // ---------- Bilder hochladen ----------
+  private flash(b: HTMLElement): void {
+    b.classList.remove('shake');
+    void b.offsetWidth;
+    b.classList.add('shake');
+  }
+
+  /** Foto/Bild -> Schwarz-Weiß-Umrisse (Vektor), Einstellung im Dialog. */
+  private async importImage(file: File): Promise<void> {
+    const rings = await openTraceDialog(file);
+    if (rings && rings.length) this.addImported(rings, 'upload:bild');
+    else if (rings) this.flash(this.btn.image);
+  }
+
+  /** SVG-Datei einfügen. */
+  private async importSvg(file: File): Promise<void> {
+    try {
+      if (file.size > 2 * 1024 * 1024) throw new Error('zu groß');
+      const rings = svgToShape(await file.text());
+      if (!rings.length) throw new Error('leer');
+      this.addImported(rings, 'upload:svg');
+    } catch {
+      this.flash(this.btn.svgfile);
+    }
+  }
+
+  private addImported(rings: Shape, ref: string): void {
+    const [x, y] = this.center();
+    const size = this.baseSize() * 0.4;
+    this.add(makeElement({ kind: 'graphic', ref, rings, op: this.currentOp, size, x, y }));
   }
 
   destroy(): void {
@@ -338,6 +433,10 @@ export class Editor {
     this.btn.dup.disabled = !sel;
     this.btn.del.disabled = !sel;
     this.btn.draw.classList.toggle('active', this.drawMode);
+    this.btn.zoomIn.disabled = this.zoom >= MAX_ZOOM - 0.01;
+    this.btn.zoomOut.disabled = this.zoom <= 1.01;
+    this.btn.zoomFit.disabled = this.zoom <= 1.01;
+    this.zoomLabel.textContent = this.zoom > 1.01 ? `${Math.round(this.zoom * 100)} %` : '';
     this.updateDims();
     const op = sel ? sel.op : this.currentOp;
     for (const o of ['cut', 'engrave', 'fill'] as Op[]) this.btn[`op-${o}`].classList.toggle('active', o === op);
@@ -409,6 +508,10 @@ export class Editor {
     } else {
       this.selectedId = null;
       this.gesture = null;
+      if (this.zoom > 1) {
+        const v = this.effView();
+        this.gesture = { t: 'pan', sx: ev.clientX, sy: ev.clientY, c0: this.zoomCenter ?? [v.x + v.w / 2, v.y + v.h / 2], k0: k };
+      }
     }
     this.requestRender();
   }
@@ -422,6 +525,11 @@ export class Editor {
     if (g.t === 'draw') {
       const last = g.pts[g.pts.length - 1];
       if (dist(last, p) > 0.4) g.pts.push(p);
+      this.requestRender();
+      return;
+    }
+    if (g.t === 'pan') {
+      this.zoomCenter = [g.c0[0] - (ev.clientX - g.sx) * g.k0, g.c0[1] - (ev.clientY - g.sy) * g.k0];
       this.requestRender();
       return;
     }
@@ -517,8 +625,11 @@ export class Editor {
 
   private center(): Pt {
     const bd = this.bounds();
-    const j = ((this.nextOffset++ % 5) - 2) * 9;
-    return [(bd.minX + bd.maxX) / 2 + j, (bd.minY + bd.maxY) / 2 + j];
+    const v = this.effView();
+    const j = ((this.nextOffset++ % 5) - 2) * 9 / this.zoom;
+    const cx = Math.min(bd.maxX, Math.max(bd.minX, v.x + v.w / 2));
+    const cy = Math.min(bd.maxY, Math.max(bd.minY, v.y + v.h / 2));
+    return [cx + j, cy + j];
   }
 
   private add(el: El): void {
@@ -528,29 +639,72 @@ export class Editor {
     this.commit();
   }
 
+  /** Alle Formen in einer aufklappenden Auswahl neben der Leiste. */
+  private openShapes(): void {
+    this.drawMode = false;
+    this.render();
+    const anchor = this.btn.shapes.getBoundingClientRect();
+    const o = overlay('overlay-clear');
+    const fly = h('div', 'flyout');
+    fly.style.left = `${anchor.right + 14}px`;
+    fly.style.top = `${Math.max(8, anchor.top - 8)}px`;
+    for (const g of SHAPE_GROUPS) {
+      const grid = h('div', 'fly-grid');
+      for (const id of g.ids) {
+        grid.append(button('btn tool', SHAPE_ICONS[id], () => {
+          o.close();
+          this.btn.shapes.classList.remove('active');
+          this.addShape(id);
+        }, SHAPE_LABELS[id]));
+      }
+      fly.append(grid);
+    }
+    o.root.addEventListener('click', (e) => {
+      if (e.target === o.root) {
+        o.close();
+        this.btn.shapes.classList.remove('active');
+      }
+    });
+    this.btn.shapes.classList.add('active');
+    o.root.append(fly);
+  }
+
   private addShape(id: ShapeId): void {
     const [x, y] = this.center();
     const size = this.baseSize() * 0.28;
     this.add(makeElement({ kind: 'shape', ref: id, rings: baseShape(id), op: this.currentOp, size, x, y }));
   }
 
-  private addGraphic(id: string): void {
-    const [x, y] = this.center();
-    const size = this.baseSize() * 0.4;
-    this.add(makeElement({ kind: 'graphic', ref: id, rings: graphicShape(id), op: this.currentOp, size, x, y }));
-  }
-
-  private addText(text: string): void {
-    const rings = textShape(text);
+  /** Text einfügen: Block = eigene Strichschrift (Vektor), sonst Webschrift -> Umrisse. */
+  private async addText(text: string, font: FontChoice): Promise<void> {
+    const clean = text.trim();
+    if (!clean) return;
+    const maxW = surfaceSize(this.surface).w * 0.9;
+    let rings: Shape;
+    let scale: number;
+    if (!font.family) {
+      rings = textShape(clean);
+      scale = 26 / GLYPH_HEIGHT; // Höhe der Großbuchstaben ca. 26 mm
+    } else {
+      const busy = overlay('overlay-dim');
+      busy.root.append(h('div', 'send-card', `<div class="spinner">${ICONS.text}</div>`));
+      try {
+        const ft = await fontTextShape(font, clean);
+        rings = ft.rings;
+        scale = 36 / ft.px; // 1 em = 36 mm (Großbuchstaben ca. 25 mm)
+      } catch {
+        busy.close();
+        return;
+      }
+      busy.close();
+    }
     if (!rings.length) return;
     const b = bbox(rings);
     const nw = b.maxX - b.minX;
     const nh = b.maxY - b.minY;
-    let scale = 26 / GLYPH_HEIGHT;
-    const maxW = surfaceSize(this.surface).w * 0.9;
     if (nw * scale > maxW) scale = maxW / nw;
     const [x, y] = this.center();
-    this.add(makeElement({ kind: 'text', ref: normalizeText(text), rings, op: this.currentOp, size: 0, x, y, exact: { w: nw * scale, h: nh * scale } }));
+    this.add(makeElement({ kind: 'text', ref: `${font.id}:${normalizeText(clean)}`, rings, op: this.currentOp, size: 0, x, y, exact: { w: nw * scale, h: nh * scale } }));
   }
 
   private setOp(op: Op): void {
@@ -646,78 +800,7 @@ export class Editor {
     this.commit();
   }
 
-  // ---------- Bilder und Text ----------
-  private openGraphics(): void {
-    this.drawMode = false;
-    const o = overlay('overlay-dim');
-    const panel = h('div', 'panel');
-    const head = h('div', 'panel-head');
-    const grid = h('div', 'pick-grid');
-    const tabs = h('div', 'tabs');
-    // Eingebaute Themen und Themen aus der offenen Bibliothek (Ordner Grafiken\ am PC)
-    type Source = { key: string; icon: string; fill: () => void };
-    const sources: Source[] = [];
-    const select = (src: Source, tab: HTMLElement) => {
-      tabs.querySelectorAll('.tab').forEach((x) => x.classList.remove('active'));
-      tab.classList.add('active');
-      src.fill();
-    };
-    const addTab = (src: Source, active = false) => {
-      sources.push(src);
-      const b = button('tab', `<span>${src.icon}</span>`, () => select(src, b), src.key);
-      if (active) b.classList.add('active');
-      tabs.append(b);
-    };
-
-    for (const t of THEMES) {
-      addTab({
-        key: t.id,
-        icon: t.icon,
-        fill: () => {
-          grid.innerHTML = '';
-          for (const g of GRAPHICS.filter((x) => x.theme === t.id)) {
-            const d = shapeToPath(graphicShape(g.id).map((r) => r.map(([x, y]) => [x, y] as Pt)), 1);
-            grid.append(
-              button('pick-item', `<svg viewBox="-4 -4 108 108"><path d="${d}" fill="#333" fill-rule="evenodd"/></svg>`, () => {
-                o.close();
-                this.addGraphic(g.id);
-              }, g.id),
-            );
-          }
-        },
-      }, t.id === THEMES[0].id);
-    }
-    sources[0].fill();
-
-    void storage
-      .listLibrary()
-      .then((themes) => {
-        if (!o.root.isConnected) return;
-        for (const t of themes) {
-          addTab({
-            key: t.id || 'Eigene',
-            icon: t.icon,
-            fill: () => {
-              grid.innerHTML = '';
-              for (const f of t.files) {
-                const item = button('pick-item', `<img src="${f.thumb}" alt="" draggable="false">`, () => void this.addLibraryGraphic(f, item), f.name);
-                grid.append(item);
-              }
-            },
-          });
-        }
-      })
-      .catch(() => undefined);
-
-    const close = () => o.close();
-    head.append(tabs, button('btn', ICONS.cross, close, 'Schließen'));
-    panel.append(head, grid);
-    o.root.append(panel);
-    this.libraryCloser = close;
-  }
-
-  private libraryCloser: (() => void) | null = null;
-
+  // ---------- Bildersuche und Text ----------
   /** Suche nach Bildern im Internet (Iconify). */
   private openSearch(): void {
     this.drawMode = false;
@@ -733,58 +816,98 @@ export class Editor {
     );
   }
 
-  /** Bild aus der offenen SVG-Bibliothek einfügen. */
-  private async addLibraryGraphic(file: LibFile, item: HTMLElement): Promise<void> {
-    try {
-      const rings = svgToShape(await file.load());
-      if (!rings.length) throw new Error('leer');
-      this.libraryCloser?.();
-      const [x, y] = this.center();
-      const size = this.baseSize() * 0.4;
-      this.add(makeElement({ kind: 'graphic', ref: `lib:${file.key}`, rings, op: this.currentOp, size, x, y }));
-    } catch {
-      item.classList.remove('shake');
-      void item.offsetWidth;
-      item.classList.add('shake');
-    }
-  }
-
   private openText(): void {
     this.drawMode = false;
     const o = overlay('overlay-dim');
     const panel = h('div', 'panel text-panel');
     const preview = h('div', 'text-preview');
+    const fontRow = h('div', 'font-row');
     const keys = h('div', 'keys');
     let text = '';
+    let font = FONTS[0];
+    let upper = true;
     const ok = button('btn key-ok', ICONS.check, () => {
+      const t = text;
+      const f = font;
       o.close();
-      this.addText(text);
+      void this.addText(t, f);
     }, 'Fertig');
+
     const refresh = () => {
-      const rings = textShape(text);
-      if (rings.length) {
-        const b = bbox(rings);
-        const pad = 1;
-        const vb = `${b.minX - pad} ${b.minY - pad} ${b.maxX - b.minX + 2 * pad} ${b.maxY - b.minY + 2 * pad}`;
-        preview.innerHTML = `<svg viewBox="${vb}" preserveAspectRatio="xMidYMid meet"><path d="${shapeToPath(rings, 2)}" fill="#333" fill-rule="evenodd"/></svg>`;
-      } else preview.innerHTML = '<span class="cursor"></span>';
-      ok.disabled = !rings.length;
+      if (!font.family) {
+        const rings = textShape(text);
+        if (rings.length) {
+          const b = bbox(rings);
+          const pad = 1;
+          const vb = `${b.minX - pad} ${b.minY - pad} ${b.maxX - b.minX + 2 * pad} ${b.maxY - b.minY + 2 * pad}`;
+          preview.innerHTML = `<svg viewBox="${vb}" preserveAspectRatio="xMidYMid meet"><path d="${shapeToPath(rings, 2)}" fill="#333" fill-rule="evenodd"/></svg>`;
+        } else preview.innerHTML = '<span class="cursor"></span>';
+        ok.disabled = !rings.length;
+      } else {
+        preview.innerHTML = '';
+        if (text) {
+          const span = h('span', 'font-preview');
+          span.setAttribute('style', fontStyle(font));
+          span.textContent = text;
+          preview.append(span);
+          let size = 64;
+          span.style.fontSize = `${size}px`;
+          while (span.scrollWidth > preview.clientWidth - 24 && size > 18) {
+            size -= 4;
+            span.style.fontSize = `${size}px`;
+          }
+        } else preview.innerHTML = '<span class="cursor"></span>';
+        ok.disabled = !text.trim();
+      }
     };
+
+    const chips: HTMLButtonElement[] = [];
+    for (const f of FONTS) {
+      const sample = f.family ? `<span style="${fontStyle(f)}">Abc</span>` : `<svg viewBox="-1 -1 22 10" preserveAspectRatio="xMidYMid meet"><path d="${shapeToPath(textShape('ABC'), 2)}" fill="currentColor" fill-rule="evenodd" transform="scale(1)"/></svg>`;
+      const chip = button('font-chip' + (f === font ? ' active' : ''), sample, () => {
+        font = f;
+        chips.forEach((c, i) => c.classList.toggle('active', FONTS[i] === f));
+        refresh();
+      }, f.label);
+      chips.push(chip);
+      fontRow.append(chip);
+    }
+
+    const MAX_TEXT = 14;
     const press = (ch: string) => {
       if (text.length < MAX_TEXT) text += ch;
       refresh();
     };
-    for (const ch of SUPPORTED_CHARS) keys.append(button('key', ch, () => press(ch), ch));
+    const letterKeys: { btn: HTMLButtonElement; ch: string }[] = [];
+    const caseOf = (ch: string) => (ch === 'ß' ? ch : upper ? ch.toUpperCase() : ch.toLowerCase());
+    const addKey = (ch: string, cased: boolean) => {
+      const k = button('key', cased ? caseOf(ch) : ch, () => press(cased ? caseOf(ch) : ch), ch);
+      if (cased) letterKeys.push({ btn: k, ch });
+      keys.append(k);
+    };
+    for (const ch of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') addKey(ch, true);
+    for (const ch of 'ÄÖÜß') addKey(ch, true);
+    for (const ch of '0123456789.!?-,:') addKey(ch, false);
+    const shift = button('key wide shift active', ICONS.shift, () => {
+      upper = !upper;
+      shift.classList.toggle('active', upper);
+      for (const { btn, ch } of letterKeys) {
+        btn.textContent = caseOf(ch);
+        btn.setAttribute('aria-label', ch);
+      }
+    }, 'Groß/Klein');
     keys.append(
+      shift,
       button('key wide', ICONS.space, () => press(' '), 'Leerzeichen'),
       button('key wide', ICONS.backspace, () => {
         text = text.slice(0, -1);
         refresh();
       }, 'Löschen'),
     );
+
     const head = h('div', 'panel-head');
     head.append(button('btn', ICONS.cross, () => o.close(), 'Schließen'), preview, ok);
-    panel.append(head, keys);
+    panel.append(head, fontRow, keys);
     o.root.append(panel);
     refresh();
   }

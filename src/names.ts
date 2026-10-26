@@ -19,9 +19,3 @@ export function exportFileName(kind: string, date: Date = new Date()): string {
   const t = `${p2(date.getHours())}-${p2(date.getMinutes())}-${p2(date.getSeconds())}`;
   return `${safeName(kind)}_${d}_${t}.svg`;
 }
-
-/** Emoji am Anfang eines Themennamens ("🐾 Tiere") abtrennen. */
-export function splitThemeName(name: string): { icon: string; name: string } {
-  const m = /^(\p{Extended_Pictographic}️?)\s*(.*)$/u.exec(name);
-  return m ? { icon: m[1], name: m[2] || name } : { icon: '🖼️', name };
-}

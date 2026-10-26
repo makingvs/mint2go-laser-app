@@ -13,7 +13,7 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 - KEIN Server nötig: Speicher auf dem Gerät (IndexedDB, src/storage.ts), Offline über Service
   Worker (scripts/make-sw.mjs), Pfade relativ (base './')
 - Einstellungen je Gerät (Lehrkraft-Bereich); Standardwerte in public/config.json
-- Bilder-Bibliothek: Grafiken/<Thema>/*.svg wird beim Bauen eingepackt (scripts/build-library.mjs)
+- Keine vorgefertigten Bilder: Bild-Upload (Foto -> Umrisse, src/trace.ts, src/imageDialog.ts) und SVG-Upload; Online-Suche (Iconify)
 - Senden an den PC ist vorerst AUSGEKLAMMERT. server/ (Node, ohne Abhängigkeiten) bleibt für
   später bzw. zum lokalen Ausliefern (start.bat, wlan-einrichten.bat, autostart-installieren.bat)
 - Bibliotheken nur nach Rückfrage -> bisher keine Laufzeit-Bibliothek: Vereinigung, Glättung,
@@ -26,6 +26,15 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 - Farben aus dem Logo: Grün #98C227, Orange #F0A030, Pink #E01070, Hellblau #38B8E8, Dunkelblau #3757A9, Schiefer #4D597C
 - Schrift Jost (@fontsource-variable/jost, OFL), Logo public/mint2go-logo.png, Zierelemente src/decor.ts, Tokens in :root von src/style.css
 - Laserfarben (Rot/Blau/Schwarz) NICHT ans CD anpassen: sie sind die Linienfarben der SVG-Ebenen
+
+## Schriften und Lizenzen (verbindlich)
+- Text: Block (eigene Strichschrift) + 7 Webschriften (src/fonts.ts), alle SIL OFL 1.1 ohne Reserved Font Name; Text wird per Canvas gezeichnet und mit src/trace.ts zu Umrissen
+- Neue Schrift/Bildquelle NUR mit: Lizenzdatei in public/licenses/ (scripts/copy-licenses.mjs für Schriften), Eintrag in THIRD-PARTY-NOTICES.md,
+  Eintrag in FONTS bzw. SET_CREDITS, @font-face in style.css. tests/licenses.test.ts prüft das.
+- Online-Bildersuche: nur Fluent Emoji (MIT, Microsoft). Noto Emoji ausgeschlossen (widersprüchliche Lizenz: OFL-Datei vs. Apache laut README/Iconify)
+- In der App: Info-Symbol (Startseite, unten links) -> Seite "Lizenzen & Quellen" (src/licenses.ts)
+- Linke Leiste: 3 Gruppen (Formen+Freihand | Bild/SVG/Suche | Text); Formen über Auswahl (openShapes), 29 Formen in src/shapes.ts (SHAPE_GROUPS)
+- Alle Werkzeugtasten tragen die Schrift unter dem Symbol (lab() in src/dom.ts, Klasse .labeled)
 
 ## Zeichenfläche
 - Pro Arbeit (design.surface): unendlich (free) oder Werkstück rect/ellipse/shape mit Maßen in mm (src/surface.ts, src/surfaceDialog.ts)
@@ -75,15 +84,21 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 ## Code-Überblick
 - src/geometry.ts: Ringe, Vereinigung (unionShapes), Glättung, Marching Squares
 - src/model.ts: Element/Entwurf, Treffertest, Rückgängig (History)
-- src/shapes.ts, src/graphics.ts, src/text.ts: Formen, Grafik-Bibliothek, Blockschrift
-- src/svgImport.ts: Import von SVG-Dateien der offenen Bibliothek (eigener Pfad-/Transform-Parser, Ordner Grafiken/<Thema>/*.svg, API /api/library)
-- src/storage.ts: IndexedDB-Speicher (Profile, Arbeiten, Einstellungen, eigene SVGs); src/exporter.ts + src/zip.ts: Export/ZIP
+- src/shapes.ts, src/text.ts: Grundformen, Blockschrift; src/trace.ts: Bild -> Umrisse
+- src/svgImport.ts: Import von SVG-Dateien (eigener Pfad-/Transform-Parser)
+- src/storage.ts: IndexedDB-Speicher (Profile, Arbeiten, Einstellungen); src/exporter.ts + src/zip.ts: Export/ZIP
 - src/svgExport.ts: Export für XCS
 - src/editor.ts: Arbeitsfläche, Gesten, Zeichnen, Export, Autospeichern
 - src/screens.ts: Profile + Galerie; src/teacher.ts: Lehrkraft-Bereich
 - server/server.mjs: optionaler Server (nicht von der App benutzt); tests/: Vitest
 
 ## Stand
+26.10.2026 (Icons/Beschriftung/Formen): Symbole vereinheitlicht (Formen-Symbole mit gleicher optischer Größe, neue Symbole für Fläche/Formen/Freihand), Schrift unter allen Werkzeugtasten, 29 vorgefertigte Formen in 3 Gruppen. 92 Tests grün.
+26.10.2026 (Leiste/Schriften/Lizenzen): Leiste gruppiert, Formen-Auswahl (9 Formen), Freihand direkt darunter; 8 Schriftarten für Text; Lizenzprüfung:
+Schriften OFL (Texte beigelegt), Noto Emoji aus der Suche entfernt, Fluent Emoji MIT mit Hinweis in der App; Test für Lizenzdateien. 87 Tests grün.
+26.10.2026: Tier-Symbole vergebener Benutzer gesperrt, Benutzer löschbar (Galerie, Mülleimer); Zoom (+, −, ganze Fläche, Verschieben
+per Ziehen auf leerer Stelle); vorgefertigte Bilder, Bilder-Knopf, Grafiken-Ordner und Server-Bibliothek entfernt; Bild-Upload
+(Umwandlung in Vektor mit Schieberegler/Umkehren) und SVG-Upload. 82 Tests grün, im Browser geprüft.
 25.10.2026 (Design): Oberfläche im MINT2Go-CD (Logo, Farben, Jost, Zahnräder, Schaltkreis-Linie, neues App-Symbol). Browser-Sichtprüfung ok.
 25.10.2026 (Zeichenfläche): Unendlich/Rechteck/Kreis-Oval/Dreieck/Stern/Herz/eigener Umriss je Arbeit, Warnzeichen bei Überstand,
 Export in Flächengröße, App aktualisiert sich selbst (Service-Worker-Wechsel nur außerhalb des Editors). 74 Tests grün, im Browser geprüft.

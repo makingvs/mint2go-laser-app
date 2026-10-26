@@ -12,19 +12,18 @@ export interface SearchConfig {
   sets: string[];
 }
 
-/** Sammlungen mit freien Lizenzen, kinderfreundlich, einfarbige zuerst (gut zum Gravieren). */
+/**
+ * Nur Sammlungen mit eindeutiger Lizenz (MIT, Microsoft Fluent Emoji), einfarbige zuerst (gut zum Gravieren).
+ * Noto Emoji bewusst nicht: Die Lizenzangaben des Projekts sind widersprüchlich (OFL in der Lizenzdatei, Apache 2.0 im README).
+ */
 export const DEFAULT_SEARCH: SearchConfig = {
   enabled: true,
-  sets: ['fluent-emoji-high-contrast', 'noto', 'fluent-emoji-flat'],
+  sets: ['fluent-emoji-high-contrast', 'fluent-emoji-flat'],
 };
 
-export const SET_CREDITS: Record<string, { name: string; author: string; license: string; url: string }> = {
-  'fluent-emoji-high-contrast': { name: 'Fluent Emoji High Contrast', author: 'Microsoft', license: 'MIT', url: 'https://github.com/microsoft/fluentui-emoji' },
-  'fluent-emoji-flat': { name: 'Fluent Emoji Flat', author: 'Microsoft', license: 'MIT', url: 'https://github.com/microsoft/fluentui-emoji' },
-  noto: { name: 'Noto Emoji', author: 'Google', license: 'Apache 2.0', url: 'https://github.com/googlefonts/noto-emoji' },
-  'noto-v1': { name: 'Noto Emoji (v1)', author: 'Google', license: 'Apache 2.0', url: 'https://github.com/googlefonts/noto-emoji' },
-  openmoji: { name: 'OpenMoji', author: 'OpenMoji', license: 'CC BY-SA 4.0', url: 'https://openmoji.org' },
-  twemoji: { name: 'Twemoji', author: 'Twitter', license: 'CC BY 4.0', url: 'https://github.com/twitter/twemoji' },
+export const SET_CREDITS: Record<string, { name: string; author: string; license: string; url: string; licenseFile: string }> = {
+  'fluent-emoji-high-contrast': { name: 'Fluent Emoji High Contrast', author: 'Microsoft Corporation', license: 'MIT', url: 'https://github.com/microsoft/fluentui-emoji', licenseFile: 'fluent-emoji' },
+  'fluent-emoji-flat': { name: 'Fluent Emoji Flat', author: 'Microsoft Corporation', license: 'MIT', url: 'https://github.com/microsoft/fluentui-emoji', licenseFile: 'fluent-emoji' },
 };
 
 export function normalizeSearchConfig(input: unknown): SearchConfig {

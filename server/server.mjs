@@ -9,7 +9,6 @@ import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const MAX_BODY = 8 * 1024 * 1024;
-const MAX_SVG = 2 * 1024 * 1024;
 
 export const DEFAULT_SETTINGS = {
   plate: { width: 300, height: 200 },
@@ -35,16 +34,6 @@ export function safeName(text, fallback = 'Kind') {
     .replace(/[^\p{L}\p{N}_ -]/gu, '')
     .trim()
     .replace(/\s+/g, '_')
-    .slice(0, 40);
-  return s || fallback;
-}
-
-/** Wie safeName, erlaubt aber Emoji (Themenordner wie "🐾 Tiere"). */
-export function safeFolderName(text, fallback = 'Eigene') {
-  const s = String(text ?? '')
-    .normalize('NFC')
-    .replace(/[^\p{L}\p{N}_ \-\p{Extended_Pictographic}️]/gu, '')
-    .trim()
     .slice(0, 40);
   return s || fallback;
 }
@@ -121,42 +110,7 @@ export function createApp({ root, distDir }) {
   fs.mkdirSync(inbox, { recursive: true });
   fs.mkdirSync(projects, { recursive: true });
 
-  const library = path.join(root, 'Grafiken');
-  fs.mkdirSync(library, { recursive: true });
-
   const profileDir = (id) => path.join(projects, safeName(id));
-
-  /** Offene SVG-Bibliothek: Grafiken/<Thema>/*.svg (lose Dateien gehören zum Thema "Eigene"). */
-  function listLibrary() {
-    const themes = [];
-    const scan = (dir, themeId) => {
-      const files = fs
-        .readdirSync(dir, { withFileTypes: true })
-        .filter((f) => f.isFile() && f.name.toLowerCase().endsWith('.svg'))
-        .sort((a, b) => a.name.localeCompare(b.name, 'de'))
-        .slice(0, 300)
-        .map((f) => ({ path: themeId ? `${themeId}/${f.name}` : f.name, name: f.name.replace(/\.svg$/i, '') }));
-      return files;
-    };
-    for (const entry of fs.readdirSync(library, { withFileTypes: true })) {
-      if (!entry.isDirectory()) continue;
-      const files = scan(path.join(library, entry.name), entry.name);
-      if (!files.length) continue;
-      const m = /^(\p{Extended_Pictographic}️?)\s*(.*)$/u.exec(entry.name);
-      themes.push({ id: entry.name, icon: m ? m[1] : '🖼️', name: m ? m[2] || entry.name : entry.name, files });
-    }
-    const loose = scan(library, '');
-    if (loose.length) themes.push({ id: '', icon: '🖼️', name: 'Eigene', files: loose });
-    themes.sort((a, b) => a.id.localeCompare(b.id, 'de'));
-    return themes;
-  }
-
-  function checkSvgText(body) {
-    if (body.length > MAX_SVG) return 'zu groß';
-    if (!/<svg[\s>]/.test(body.slice(0, 4000))) return 'kein SVG';
-    if (/<script/i.test(body)) return 'Skripte nicht erlaubt';
-    return null;
-  }
 
   async function api(req, res, url) {
     const parts = url.pathname.split('/').filter(Boolean).map(decodeURIComponent); // ['api', ...]
@@ -178,35 +132,6 @@ export function createApp({ root, distDir }) {
         const merged = mergeSettings(JSON.parse(await readBody(req)));
         fs.writeFileSync(settingsFile, JSON.stringify(merged, null, 2));
         return sendJson(res, 200, merged);
-      }
-    }
-
-    if (route[0] === 'library') {
-      if (route.length === 1 && method === 'GET') return sendJson(res, 200, listLibrary());
-      if (route[1] === 'file' && method === 'GET') {
-        const full = path.resolve(library, url.searchParams.get('path') ?? '');
-        if (!full.startsWith(library + path.sep) || !full.toLowerCase().endsWith('.svg') || !fs.existsSync(full)) {
-          return sendJson(res, 404, { error: 'nicht gefunden' });
-        }
-        if (fs.statSync(full).size > MAX_SVG) return sendJson(res, 413, { error: 'zu groß' });
-        res.writeHead(200, {
-          'Content-Type': 'image/svg+xml',
-          'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
-          'Cache-Control': 'no-cache',
-        });
-        fs.createReadStream(full).pipe(res);
-        return;
-      }
-      if (route[1] === 'upload' && method === 'POST') {
-        const body = await readBody(req);
-        const problem = checkSvgText(body);
-        if (problem) return sendJson(res, 400, { ok: false, error: problem });
-        const theme = safeFolderName(url.searchParams.get('theme') || 'Eigene');
-        const name = safeName((url.searchParams.get('name') || 'bild').replace(/\.svg$/i, ''), 'bild');
-        const dir = path.join(library, theme);
-        fs.mkdirSync(dir, { recursive: true });
-        fs.writeFileSync(path.join(dir, `${name}.svg`), body, 'utf8');
-        return sendJson(res, 200, { ok: true, path: `${theme}/${name}.svg` });
       }
     }
 

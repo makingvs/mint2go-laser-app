@@ -85,39 +85,6 @@ describe('Server', () => {
     expect(fs.readdirSync(path.join(root, 'Projekte', 'Fuchs', '_Papierkorb'))).toHaveLength(1);
   });
 
-  it('verwaltet die offene SVG-Bibliothek', async () => {
-    expect((await json('/api/library')).body).toEqual([]);
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><rect width="10" height="10"/></svg>';
-    const up = await json('/api/library/upload?theme=' + encodeURIComponent('🐾 Tiere') + '&name=Fuchs%20Kopf.svg', { method: 'POST', body: svg });
-    expect(up.body.path).toBe('🐾 Tiere/Fuchs_Kopf.svg');
-    fs.writeFileSync(path.join(root, 'Grafiken', 'lose.svg'), svg);
-
-    const list = (await json('/api/library')).body;
-    const tiere = list.find((t: { id: string }) => t.id === '🐾 Tiere');
-    expect(tiere).toMatchObject({ icon: '🐾', name: 'Tiere', files: [{ path: '🐾 Tiere/Fuchs_Kopf.svg', name: 'Fuchs_Kopf' }] });
-    expect(list.find((t: { id: string }) => t.id === '')).toMatchObject({ name: 'Eigene', files: [{ path: 'lose.svg' }] });
-
-    const file = await fetch(base + '/api/library/file?path=' + encodeURIComponent('🐾 Tiere/Fuchs_Kopf.svg'));
-    expect(file.headers.get('content-type')).toBe('image/svg+xml');
-    expect(await file.text()).toBe(svg);
-  });
-
-  it('schützt die Bibliothek vor Pfadtricks, Skripten und Nicht-SVG', async () => {
-    const out = await fetch(base + '/api/library/file?path=' + encodeURIComponent('../geheim.txt'));
-    expect(out.status).toBe(404);
-    const out2 = await fetch(base + '/api/library/file?path=' + encodeURIComponent('../einstellungen.json'));
-    expect(out2.status).toBe(404);
-    const bad = await json('/api/library/upload?theme=X&name=a', { method: 'POST', body: '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' });
-    expect(bad.status).toBe(400);
-    expect((await json('/api/library/upload?theme=X&name=a', { method: 'POST', body: 'hallo' })).status).toBe(400);
-    const trick = await json('/api/library/upload?theme=' + encodeURIComponent('../..') + '&name=' + encodeURIComponent('../../x'), {
-      method: 'POST',
-      body: '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
-    });
-    expect(trick.body.path).not.toContain('..');
-    expect(fs.existsSync(path.join(root, 'x.svg'))).toBe(false);
-  });
-
   it('speichert Einstellungen mit Grenzen', async () => {
     const d = (await json('/api/settings')).body;
     expect(d.plate.width).toBe(300);

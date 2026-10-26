@@ -1,7 +1,6 @@
 // Alle Symbole als Inline-SVG (keine Texte nötig für Kinder).
-import { shapeToPath } from './geometry';
-import { baseShape, type ShapeId } from './shapes';
-import { normalizeBase } from './model';
+import { bbox, shapeArea, shapeToPath } from './geometry';
+import { SHAPE_IDS, baseShape, type ShapeId } from './shapes';
 
 const svg = (inner: string, extra = '') =>
   `<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" ${extra}>${inner}</svg>`;
@@ -20,15 +19,23 @@ export const ICONS = {
   arrowH: svg('<path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/>'),
   arrowV: svg('<path d="M12 3v18M8 7l4-4 4 4M8 17l4 4 4-4"/>'),
   search: svg('<circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/>'),
-  canvas: svg('<rect x="4" y="6" width="16" height="12" rx="1.5" stroke-dasharray="3 2.4"/><path d="M8 2.5v3M16 2.5v3M8 18.5v3M16 18.5v3M2.5 9v0M2.5 15v0"/>'),
+  canvas: svg('<rect x="3.500" y="3.500" width="17" height="17" rx="2.500"/><path d="M8 3.500v3M12 3.500v2M16 3.500v3M3.500 8h3M3.500 12h2M3.500 16h3"/>'),
   infinity: svg('<path d="M12 12c-2-3-3.500-4-5.500-4a4 4 0 0 0 0 8c2 0 3.500-1 5.500-4zm0 0c2 3 3.500 4 5.500 4a4 4 0 0 0 0-8c-2 0-3.500 1-5.500 4z"/>'),
   rect: svg('<rect x="3" y="6" width="18" height="12" rx="1.5"/>'),
   folder: svg('<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'),
+  contrast: svg('<circle cx="12" cy="12" r="8.5"/><path d="M12 3.500v17a8.500 8.500 0 0 0 0-17z" fill="currentColor"/>'),
+  shapes: svg('<circle cx="7.500" cy="7.500" r="3.500"/><rect x="13.500" y="4" width="7" height="7" rx="1.200"/><path d="M7.500 13.500 11.200 20.500H3.800z"/><path d="m17 13.200 3.500 3.800-3.500 3.800-3.500-3.800z"/>'),
+  info: svg('<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.500v.5"/>'),
+  shift: svg('<path d="M12 4 4 13h4.500v6h7v-6H20z"/>'),
+  minus: svg('<path d="M5 12h14"/>'),
+  fit: svg('<path d="M4 9V5h4M20 9V5h-4M4 15v4h4M20 15v4h-4"/><rect x="8.500" y="9" width="7" height="6" rx="1"/>'),
+  imageUp: svg('<rect x="3" y="4" width="18" height="16" rx="2.500"/><circle cx="8.500" cy="9.500" r="1.800"/><path d="m3 17 5-4.500 4 3.500"/><path d="M17 17.500v-6M14.500 14l2.500-2.500 2.500 2.500"/>'),
+  svgUp: svg('<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9.500 17.500 12 12l2.500 5.500z"/>'),
   download: svg('<path d="M12 3v12M7 10l5 5 5-5"/><path d="M4 20h16"/>'),
   send: svg('<path d="M3 11 21 3l-7 18-3-8z"/><path d="M11 13 21 3"/>'),
   picture: svg('<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="m3 18 6-5 4 4 3-3 5 5"/>'),
   text: svg('<path d="M5 20 12 4l7 16M8 14h8"/>'),
-  draw: svg('<path d="M3 17C6 8 9 22 12 13s6-5 9-7"/>'),
+  draw: svg('<circle cx="5" cy="18" r="1.600" fill="currentColor" stroke="none"/><path d="M5 18c5.500-.5 3.500-10 8.500-10s3.500 7 7.500 6"/>'),
   check: svg('<path d="m4 12 6 6L20 6"/>'),
   cross: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
   plus: svg('<path d="M12 4v16M4 12h16"/>'),
@@ -45,19 +52,20 @@ export const ICONS = {
   retry: svg('<path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 3v5h-5"/>'),
 };
 
+/** Symbol einer Form: Fläche ca. gleich groß, damit Kreis, Stern und Pfeil gleich schwer wirken. */
 function shapeIcon(id: ShapeId): string {
-  const { base } = normalizeBase(baseShape(id));
-  const scaled = base.map((r) => r.map(([x, y]) => [12 + x * 17, 12 + y * 17] as [number, number]));
-  return svg(`<path d="${shapeToPath(scaled, 2)}" fill="currentColor" stroke="none" fill-opacity=".15"/><path d="${shapeToPath(scaled, 2)}"/>`);
+  const raw = baseShape(id);
+  const b = bbox(raw);
+  const w = b.maxX - b.minX;
+  const h = b.maxY - b.minY;
+  const k = Math.min(19 / Math.max(w, h), Math.sqrt(235 / Math.max(Math.abs(shapeArea(raw)), 1e-6)));
+  const cx = (b.minX + b.maxX) / 2;
+  const cy = (b.minY + b.maxY) / 2;
+  const d = shapeToPath(raw.map((r) => r.map(([x, y]) => [12 + (x - cx) * k, 12 + (y - cy) * k] as [number, number])), 2);
+  return svg(`<path d="${d}" fill="currentColor" fill-opacity=".14" fill-rule="evenodd" stroke="none"/><path d="${d}" stroke-width="2"/>`);
 }
 
-export const SHAPE_ICONS: Record<ShapeId, string> = {
-  circle: shapeIcon('circle'),
-  square: shapeIcon('square'),
-  triangle: shapeIcon('triangle'),
-  star: shapeIcon('star'),
-  heart: shapeIcon('heart'),
-};
+export const SHAPE_ICONS = Object.fromEntries(SHAPE_IDS.map((id) => [id, shapeIcon(id)])) as Record<ShapeId, string>;
 
 export const ANIMALS: { icon: string; name: string }[] = [
   { icon: '🦊', name: 'Fuchs' },

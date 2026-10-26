@@ -1,5 +1,5 @@
 // Zeichenfläche: unendlich oder Werkstück (Rechteck, Kreis/Oval, Form, eigener Umriss) mit Maßen in mm.
-import { bbox, distToPolyline, pointInShape, transformShape, type BBox, type Shape } from './geometry';
+import { bbox, distToPolyline, pointInShape, transformShape, type BBox, type Pt, type Shape } from './geometry';
 import { normalizeBase, worldShape, type Design, type El, type Settings, type Surface } from './model';
 import { baseShape, type ShapeId } from './shapes';
 
@@ -102,6 +102,19 @@ export function growView(prev: View | null, els: El[]): View {
     maxY = Math.max(maxY, prev.y + prev.h);
   }
   return { x: minX, y: minY, w: maxX - minX, h: maxY - minY };
+}
+
+export const MAX_ZOOM = 8;
+
+/** Ausschnitt bei Zoom: gleicher Mittelpunkt, 1/zoom der Breite/Höhe, bleibt innerhalb der Gesamtansicht. */
+export function zoomedView(base: View, zoom: number, center?: Pt | null): View {
+  const z = Math.min(MAX_ZOOM, Math.max(1, zoom));
+  if (z === 1) return base;
+  const w = base.w / z;
+  const h = base.h / z;
+  const cx = Math.min(base.x + base.w - w / 2, Math.max(base.x + w / 2, center ? center[0] : base.x + base.w / 2));
+  const cy = Math.min(base.y + base.h - h / 2, Math.max(base.y + h / 2, center ? center[1] : base.y + base.h / 2));
+  return { x: cx - w / 2, y: cy - h / 2, w, h };
 }
 
 export function viewFor(s: Surface, els: El[], prev: View | null): View {

@@ -3,8 +3,7 @@ import { exportSvg } from '../src/svgExport';
 import { DEFAULT_SETTINGS, makeElement, type El, type Op } from '../src/model';
 import { baseShape } from '../src/shapes';
 import { textShape, GLYPH_HEIGHT } from '../src/text';
-import { GRAPHICS, graphicShape } from '../src/graphics';
-import { pointInShape, shapeArea } from '../src/geometry';
+import { shapeArea } from '../src/geometry';
 
 const shape = (id: 'circle' | 'square' | 'star' | 'heart' | 'triangle', op: Op, x: number, y: number, size = 40): El =>
   makeElement({ kind: 'shape', ref: id, rings: baseShape(id), op, size, x, y });
@@ -76,20 +75,5 @@ describe('Text', () => {
     expect(textShape('äöü').length).toBeGreaterThan(5);
     expect(textShape('0123456789').length).toBeGreaterThan(10);
     expect(textShape('anna')).toEqual(textShape('ANNA'));
-  });
-});
-
-describe('Grafik-Bibliothek', () => {
-  it('liefert für jedes Motiv einen gültigen Umriss; Löcher liegen im Körper', () => {
-    expect(GRAPHICS.length).toBeGreaterThanOrEqual(10);
-    for (const g of GRAPHICS) {
-      const s = graphicShape(g.id);
-      expect(s.length, g.id).toBeGreaterThan(0);
-      expect(shapeArea(s), g.id).toBeGreaterThan(300);
-    }
-    // Auge des Fischs ist ein Loch, Körper daneben ist gefüllt
-    const fish = graphicShape('fisch');
-    expect(pointInShape([26, 45], fish)).toBe(false);
-    expect(pointInShape([50, 50], fish)).toBe(true);
   });
 });

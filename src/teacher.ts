@@ -67,41 +67,6 @@ export function openTeacher(current: Settings, onSaved: (s: Settings) => void): 
     'Die Farben müssen für alle Dateien gleich bleiben, damit die Ebenen in xTool Creative Space jedes Mal gleich zugeordnet werden können. Diese Einstellungen gelten nur für dieses iPad. Standardwerte für alle Geräte stehen in der Datei <b>config.json</b> der App.',
   );
 
-  // Eigene SVG-Bilder: bleiben auf diesem Gerät und erscheinen sofort im Bilder-Menü.
-  const theme = h('input');
-  theme.type = 'text';
-  theme.value = 'Eigene';
-  theme.maxLength = 30;
-  const result = h('p', 'hint');
-  const picker = h('input');
-  picker.type = 'file';
-  picker.accept = '.svg,image/svg+xml';
-  picker.multiple = true;
-  picker.hidden = true;
-  picker.addEventListener('change', async () => {
-    let ok = 0;
-    let failed = 0;
-    for (const f of Array.from(picker.files ?? [])) {
-      try {
-        await storage.addLibrarySvg(theme.value.trim() || 'Eigene', f.name, await f.text());
-        ok++;
-      } catch {
-        failed++;
-      }
-    }
-    picker.value = '';
-    result.textContent = failed ? `${ok} Datei(en) hinzugefügt, ${failed} abgelehnt (kein gültiges SVG, Skripte oder größer als 2 MB).` : `${ok} Datei(en) hinzugefügt.`;
-  });
-  const library = h('div', 'tform-block');
-  library.append(
-    h('b', '', 'Eigene Bilder (SVG)'),
-    field('Thema (z. B. „🐾 Tiere“)', theme),
-    button('chip', 'SVG-Dateien hinzufügen …', () => picker.click()),
-    picker,
-    result,
-    h('p', 'hint', 'Am besten Silhouetten oder Umrisse aus gefüllten Formen. Text, Bilder und Verläufe werden übersprungen. Nur Dateien verwenden, deren Lizenz das erlaubt (z. B. CC0).'),
-  );
-
   // Alle Arbeiten aller Kinder als ZIP sichern
   const exportResult = h('p', 'hint');
   const exportBlock = h('div', 'tform-block');
@@ -159,7 +124,6 @@ export function openTeacher(current: Settings, onSaved: (s: Settings) => void): 
     field('Farbe Flächengravur (Farbrolle)', color(s.colors.fill, (v) => (s.colors.fill = v))),
     field('Mindestgröße / dünnste Stelle (mm)', num(s.minSize, (v) => (s.minSize = v), 0, 50, 0.5)),
     hint,
-    library,
     credits,
     exportBlock,
     reset,

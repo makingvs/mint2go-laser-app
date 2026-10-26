@@ -4,7 +4,7 @@ import { shapeToPath } from './geometry';
 import { ICONS, SHAPE_ICONS } from './icons';
 import type { Settings, Surface } from './model';
 import { formatNumber, openNumpad } from './numpad';
-import { storage } from './storage';
+import { openTraceDialog } from './imageDialog';
 import { svgToShape } from './svgImport';
 import {
   MAX_SIDE,
@@ -160,42 +160,33 @@ export function openSurfaceDialog(opts: { current?: Surface; settings: Pick<Sett
   refresh();
 }
 
-/** Eigene Form aus der Bibliothek (SVG-Umrisse, z. B. vom Lehrer hinzugefügt) wählen. */
+/** Eigene Form aus einer hochgeladenen Datei: SVG direkt, Foto/Bild über die Umwandlung in Umrisse. */
 function pickCustom(): Promise<Surface | null> {
   return new Promise((resolve) => {
-    const dlg = overlay('overlay-dim');
-    const panel = h('div', 'panel');
-    const head = h('div', 'panel-head');
-    const grid = h('div', 'pick-grid');
-    const done = (s: Surface | null) => {
-      dlg.close();
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.svg,image/*';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    let finished = false;
+    const finish = (s: Surface | null) => {
+      if (finished) return;
+      finished = true;
+      input.remove();
       resolve(s);
     };
-    head.append(button('btn', ICONS.cross, () => done(null), 'Schließen'), h('div', 'surface-title', ICONS.folder));
-    panel.append(head, grid);
-    dlg.root.append(panel);
-    grid.innerHTML = '<div class="search-msg"><div class="spinner">' + ICONS.folder + '</div></div>';
-    void storage.listLibrary().then((themes) => {
-      grid.innerHTML = '';
-      const files = themes.flatMap((t) => t.files);
-      if (!files.length) {
-        grid.innerHTML = `<div class="search-msg"><div class="big-emoji">📂</div></div>`;
-        return;
-      }
-      for (const f of files) {
-        const item = button('pick-item', `<img src="${f.thumb}" alt="" draggable="false">`, async () => {
-          try {
-            const rings = svgToShape(await f.load());
-            if (!rings.length) throw new Error('leer');
-            done(shapeSurface(`lib:${f.key}`, rings, 200));
-          } catch {
-            item.classList.remove('shake');
-            void item.offsetWidth;
-            item.classList.add('shake');
-          }
-        }, f.name);
-        grid.append(item);
+    input.addEventListener('cancel', () => finish(null));
+    input.addEventListener('change', async () => {
+      const f = input.files?.[0];
+      if (!f) return finish(null);
+      try {
+        const isSvg = /svg/i.test(f.type) || /\.svg$/i.test(f.name);
+        const rings = isSvg ? svgToShape(await f.text()) : await openTraceDialog(f);
+        finish(rings && rings.length ? shapeSurface('upload', rings, 200) : null);
+      } catch {
+        finish(null);
       }
     });
+    input.click();
   });
 }

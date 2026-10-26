@@ -12,6 +12,8 @@ import {
   freeSurface,
   growView,
   isOutside,
+  MAX_ZOOM,
+  zoomedView,
   normalizeSurface,
   rectSurface,
   shapeSurface,
@@ -106,5 +108,29 @@ describe('Zeichenfläche: Warnung und Export', () => {
   it('nimmt für ältere Arbeiten ohne Fläche die Standardgröße', () => {
     const svg = exportSvg({ elements: [] }, { ...DEFAULT_SETTINGS, plate: { width: 250, height: 150 } });
     expect(svg).toContain('width="250mm" height="150mm"');
+  });
+});
+
+describe('Zoom', () => {
+  const base = { x: -10, y: -10, w: 320, h: 220 };
+
+  it('ohne Zoom bleibt die ganze Fläche sichtbar', () => {
+    expect(zoomedView(base, 1, [0, 0])).toEqual(base);
+  });
+
+  it('zoomt um die Mitte und verkleinert den Ausschnitt (mm bleiben mm)', () => {
+    const v = zoomedView(base, 2, [150, 100]);
+    expect(v.w).toBeCloseTo(160, 6);
+    expect(v.h).toBeCloseTo(110, 6);
+    expect(v.x + v.w / 2).toBeCloseTo(150, 6);
+    expect(v.y + v.h / 2).toBeCloseTo(100, 6);
+  });
+
+  it('bleibt beim Verschieben innerhalb der Gesamtansicht und begrenzt den Zoom', () => {
+    const v = zoomedView(base, 4, [-500, 900]);
+    expect(v.x).toBeCloseTo(base.x, 6);
+    expect(v.y + v.h).toBeCloseTo(base.y + base.h, 6);
+    expect(zoomedView(base, 100, null).w).toBeCloseTo(base.w / MAX_ZOOM, 6);
+    expect(zoomedView(base, 0.2, null)).toEqual(base);
   });
 });

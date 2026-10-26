@@ -13,7 +13,6 @@
     "enabled": true,
     "sets": [
       "fluent-emoji-high-contrast",
-      "noto",
       "fluent-emoji-flat"
     ]
   }

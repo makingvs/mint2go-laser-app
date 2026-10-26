@@ -5,9 +5,8 @@
   "type": "module",
   "description": "Laser-Zeichen-App für Kinder (eigenständige iPad-Web-App, offline-fähig)",
   "scripts": {
-    "dev": "node scripts/build-library.mjs && vite",
-    "library": "node scripts/build-library.mjs",
-    "build": "tsc --noEmit && node scripts/build-library.mjs && vite build && node scripts/make-sw.mjs",
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build && node scripts/make-sw.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "start": "node server/server.mjs"
@@ -19,6 +18,12 @@
     "vitest": "^2.1.4"
   },
   "dependencies": {
-    "@fontsource-variable/jost": "^5.3.0"
+    "@fontsource-variable/baloo-2": "^5.3.0",
+    "@fontsource-variable/caveat": "^5.3.0",
+    "@fontsource-variable/fredoka": "^5.3.0",
+    "@fontsource-variable/jost": "^5.3.0",
+    "@fontsource/bangers": "^5.3.0",
+    "@fontsource/pacifico": "^5.3.0",
+    "@fontsource/rubik-mono-one": "^5.3.0"
   }
 }
