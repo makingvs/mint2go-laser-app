@@ -2,8 +2,7 @@
 import { cdLineMarkup, gearsMarkup } from './decor';
 import { openLicenses } from './licenses';
 import { button, confirmDialog, h, onLongPress, overlay } from './dom';
-import { buildZip, saveFile, saveSvg, zipName } from './exporter';
-import { exportFileName } from './names';
+import { buildZip, saveFile, saveSvg } from './exporter';
 import { openSaveDialog } from './saveDialog';
 import { ANIMALS, ICONS } from './icons';
 import { thumbnailSvg } from './render';
@@ -123,7 +122,6 @@ export function galleryScreen(
       return;
     }
     openSaveDialog({
-      defaultName: zipName(profile.name),
       ext: 'zip',
       onSave: (fileName) => void saveFile(fileName, buildZip(designs, [profile], settings), 'application/zip'),
     });
@@ -160,7 +158,6 @@ export function galleryScreen(
           void load();
         }, 'Löschen');
         const exp = button('work-export', ICONS.download, () => openSaveDialog({
-          defaultName: exportFileName(profile.name, new Date(d.updated || d.created || Date.now())),
           ext: 'svg',
           onSave: (fileName) => void saveSvg(profile, d, settings, fileName),
         }), 'Exportieren');

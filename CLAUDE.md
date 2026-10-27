@@ -28,9 +28,13 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 - Laserfarben (Rot/Blau/Schwarz) NICHT ans CD anpassen: sie sind die Linienfarben der SVG-Ebenen
 
 ## Bedienung (Regeln)
-- Jeder Export/Download fragt vorher den Dateinamen ab (src/saveDialog.ts, sanitizeFileName); Speichern startet direkt im Tipp auf ✓ (Teilen-Menü braucht eine Benutzeraktion)
+- Jeder Export/Download verlangt einen vom Benutzer selbst eingetippten Dateinamen, KEIN Vorschlag (src/saveDialog.ts, sanitizeFileName); Speichern startet direkt im Tipp auf ✓ (Teilen-Menü braucht eine Benutzeraktion)
 - Text-Teile merken Schrift/Wortlaut (El.text) und sind über die Taste "Schrift" nachträglich änderbar (replaceText)
 - Layout: Größen über CSS-Variablen je Fensterhöhe (:root + @media max-height 760/640); nach Layout-Änderungen auf mehreren Größen prüfen (Überdeckungen/Abschneiden)
+
+- Tastatur: deutsches Layout QWERTZ (src/keyboard.ts) für Text und Suche
+- Seitenverhältnis-Sperre (Schloss) gilt auch fürs Ziehen an den Ecken; aufgehoben = freies Strecken
+- Nichts darf Inhalte überdecken: keine absolut positionierten Tasten über scrollenden Listen (Info-Symbol im Kopfbereich)
 
 ## Schriften und Lizenzen (verbindlich)
 - Text: Block (eigene Strichschrift) + 7 Webschriften (src/fonts.ts), alle SIL OFL 1.1 ohne Reserved Font Name; Text wird per Canvas gezeichnet und mit src/trace.ts zu Umrissen
@@ -98,6 +102,7 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 - server/server.mjs: optionaler Server (nicht von der App benutzt); tests/: Vitest
 
 ## Stand
+27.10.2026: Deutsche Tastatur (QWERTZ), Dateiname ohne Vorschlag, freies Ziehen an Ecken ohne Seitenverhältnis-Sperre, Info-Symbol aus der Kartenliste, ultra-kompaktes Layout (< 540 px). 98 Tests grün.
 26.10.2026 (Layout/Dateiname/Schrift ändern): Layout-Prüfung auf 7 Fenstergrößen (ohne Befund nach Anpassung: höhenabhängige Größen, Formen-Auswahl im Fenster, Zahlentastatur/Dialoge scrollbar, Galerie-Tasten unter dem Bild), Dateiname vor jedem Export, Text/Schrift nachträglich änderbar. 94 Tests grün.
 26.10.2026 (Icons/Beschriftung/Formen): Symbole vereinheitlicht (Formen-Symbole mit gleicher optischer Größe, neue Symbole für Fläche/Formen/Freihand), Schrift unter allen Werkzeugtasten, 29 vorgefertigte Formen in 3 Gruppen. 92 Tests grün.
 26.10.2026 (Leiste/Schriften/Lizenzen): Leiste gruppiert, Formen-Auswahl (9 Formen), Freihand direkt darunter; 8 Schriftarten für Text; Lizenzprüfung:

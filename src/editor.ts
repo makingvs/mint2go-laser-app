@@ -1,9 +1,9 @@
 // Die Arbeitsfläche: Formen setzen, verschieben, drehen, skalieren, zeichnen, exportieren.
 import { storage, type Profile } from './storage';
 import { openTraceDialog } from './imageDialog';
+import { buildKeyboard } from './keyboard';
 import { saveSvg } from './exporter';
 import { openSaveDialog } from './saveDialog';
-import { exportFileName } from './names';
 import { svgToShape } from './svgImport';
 import { bbox, dist, resample, shapeToPath, simplify, smooth, transformPoint, type Pt, type Ring, type Shape } from './geometry';
 import { ICONS, SHAPE_ICONS } from './icons';
@@ -30,7 +30,7 @@ export interface EditorOpts {
 
 type Gesture =
   | { t: 'move'; id: string; start: Pt; ox: number; oy: number }
-  | { t: 'scale'; id: string; c: Pt; d0: number; w0: number; h0: number }
+  | { t: 'scale'; id: string; c: Pt; d0: number; w0: number; h0: number; rot: number; lx0: number; ly0: number }
   | { t: 'rotate'; id: string; c: Pt; a0: number; rot0: number }
   | { t: 'pinch'; id: string; d0: number; a0: number; m0: Pt; w0: number; h0: number; rot0: number; x0: number; y0: number }
   | { t: 'draw'; pts: Pt[] }
@@ -500,7 +500,13 @@ export class Editor {
         return;
       }
       if (hd.corners.some((c) => dist(p, c) <= reach)) {
-        this.gesture = { t: 'scale', id: sel.id, c: [sel.x, sel.y], d0: Math.max(dist(p, [sel.x, sel.y]), 1e-3), w0: sel.w, h0: sel.h };
+        // Zeigerposition im gedrehten Koordinatensystem des Teils (für freies Strecken ohne Seitenverhältnis-Sperre)
+        const a = (sel.rot * Math.PI) / 180;
+        const dx = p[0] - sel.x;
+        const dy = p[1] - sel.y;
+        const lx0 = dx * Math.cos(a) + dy * Math.sin(a);
+        const ly0 = -dx * Math.sin(a) + dy * Math.cos(a);
+        this.gesture = { t: 'scale', id: sel.id, c: [sel.x, sel.y], d0: Math.max(dist(p, [sel.x, sel.y]), 1e-3), w0: sel.w, h0: sel.h, rot: sel.rot, lx0: Math.abs(lx0) < 1e-3 ? 1e-3 : lx0, ly0: Math.abs(ly0) < 1e-3 ? 1e-3 : ly0 };
         return;
       }
     }
@@ -555,7 +561,19 @@ export class Editor {
       el.y = clampY(g.oy + p[1] - g.start[1]);
       this.changed = this.changed || dist(p, g.start) > 0.5;
     } else if (g.t === 'scale') {
-      clampScale(g.w0, g.h0, dist(p, g.c) / g.d0);
+      if (this.lockAspect) {
+        clampScale(g.w0, g.h0, dist(p, g.c) / g.d0);
+      } else {
+        // Sperre aus: Breite und Höhe folgen dem Zeiger unabhängig voneinander
+        const a = (g.rot * Math.PI) / 180;
+        const dx = p[0] - g.c[0];
+        const dy = p[1] - g.c[1];
+        const lx = dx * Math.cos(a) + dy * Math.sin(a);
+        const ly = -dx * Math.sin(a) + dy * Math.cos(a);
+        const lim = (v: number) => Math.min(maxSize, Math.max(2, v));
+        el.w = lim(g.w0 * Math.abs(lx / g.lx0));
+        el.h = lim(g.h0 * Math.abs(ly / g.ly0));
+      }
       this.changed = true;
     } else if (g.t === 'rotate') {
       let rot = g.rot0 + ((Math.atan2(p[1] - g.c[1], p[0] - g.c[0]) - g.a0) * 180) / Math.PI;
@@ -870,11 +888,9 @@ export class Editor {
     const panel = h('div', 'panel text-panel');
     const preview = h('div', 'text-preview');
     const fontRow = h('div', 'font-row');
-    const keys = h('div', 'keys');
     const info = edit ? textInfo(edit) : null;
     let text = info?.value ?? '';
     let font = info?.font ?? FONTS[0];
-    let upper = true;
     const ok = button('btn key-ok', ICONS.check, () => {
       const t = text;
       const f = font;
@@ -927,32 +943,16 @@ export class Editor {
       if (text.length < MAX_TEXT) text += ch;
       refresh();
     };
-    const letterKeys: { btn: HTMLButtonElement; ch: string }[] = [];
-    const caseOf = (ch: string) => (ch === 'ß' ? ch : upper ? ch.toUpperCase() : ch.toLowerCase());
-    const addKey = (ch: string, cased: boolean) => {
-      const k = button('key', cased ? caseOf(ch) : ch, () => press(cased ? caseOf(ch) : ch), ch);
-      if (cased) letterKeys.push({ btn: k, ch });
-      keys.append(k);
-    };
-    for (const ch of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ') addKey(ch, true);
-    for (const ch of 'ÄÖÜß') addKey(ch, true);
-    for (const ch of '0123456789.!?-,:') addKey(ch, false);
-    const shift = button('key wide shift active', ICONS.shift, () => {
-      upper = !upper;
-      shift.classList.toggle('active', upper);
-      for (const { btn, ch } of letterKeys) {
-        btn.textContent = caseOf(ch);
-        btn.setAttribute('aria-label', ch);
-      }
-    }, 'Groß/Klein');
-    keys.append(
-      shift,
-      button('key wide', ICONS.space, () => press(' '), 'Leerzeichen'),
-      button('key wide', ICONS.backspace, () => {
+    const keyboard = buildKeyboard({
+      shift: true,
+      onChar: press,
+      onSpace: () => press(' '),
+      onBackspace: () => {
         text = text.slice(0, -1);
         refresh();
-      }, 'Löschen'),
-    );
+      },
+    });
+    const keys = keyboard.el;
 
     const head = h('div', 'panel-head');
     head.append(button('btn', ICONS.cross, () => o.close(), 'Schließen'), preview, ok);
@@ -1017,7 +1017,6 @@ export class Editor {
     this.render();
     // Der Benutzer legt den Dateinamen fest; gespeichert wird direkt aus dem Tipp auf ✓ (Teilen-Menü).
     openSaveDialog({
-      defaultName: exportFileName(this.o.profile.name),
       ext: 'svg',
       onSave: async (fileName) => {
         const result = await saveSvg(this.o.profile, this.o.design, this.settings, fileName);

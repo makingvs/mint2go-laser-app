@@ -2,7 +2,7 @@
 // (die iPad-Tastatur würde die Fläche verschieben); Vorschläge zum Antippen für Kinder, die noch nicht tippen.
 import { button, h, overlay } from './dom';
 import { ICONS } from './icons';
-import { SUPPORTED_CHARS } from './text';
+import { buildKeyboard } from './keyboard';
 import { TOPICS, fetchIconSvg, hitRef, searchIcons, type Hit, type SearchConfig } from './online';
 
 const MAX_QUERY = 20;
@@ -20,8 +20,18 @@ export function openOnlineSearch(cfg: SearchConfig, onPick: (svg: string, ref: s
 
   const body = h('div', 'search-body');
   const results = h('div', 'pick-grid search-results');
-  const keys = h('div', 'keys search-keys');
-  body.append(results, keys);
+  const keyboard = buildKeyboard({
+    shift: false,
+    onChar: (ch) => press(ch),
+    onSpace: () => press(' '),
+    onBackspace: () => {
+      text = text.slice(0, -1);
+      showText();
+      void run(false);
+    },
+  });
+  keyboard.el.classList.add('search-kb');
+  body.append(results, keyboard.el);
   panel.append(head, body);
   dlg.root.append(panel);
 
@@ -103,16 +113,6 @@ export function openOnlineSearch(cfg: SearchConfig, onPick: (svg: string, ref: s
     showText();
     void run(false);
   };
-  for (const ch of SUPPORTED_CHARS.filter((c) => /[A-ZÄÖÜ]/.test(c))) keys.append(button('key', ch, () => press(ch.toLowerCase()), ch));
-  keys.append(
-    button('key wide', ICONS.space, () => press(' '), 'Leerzeichen'),
-    button('key wide', ICONS.backspace, () => {
-      text = text.slice(0, -1);
-      showText();
-      void run(false);
-    }, 'Löschen'),
-  );
-
   showText();
   topics();
 }

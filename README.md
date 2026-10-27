@@ -57,7 +57,7 @@ Die Pfade sind relativ (`base: './'`), die App funktioniert daher auch in einem 
 
 ## Export der SVGs
 
-**Vor jedem Export/Download fragt die App nach dem Dateinamen** (Vorschlag: `<Kind>_<Datum>_<Uhrzeit>`, die Endung `.svg` bzw. `.zip` steht fest daneben). Ungültige Zeichen (` / : * ? " < > |`) werden entfernt, ein leerer Name ist nicht möglich. Das gilt für die grüne Export-Taste, für „Arbeit exportieren“ in der Galerie und für beide ZIP-Exporte.
+**Vor jedem Export/Download muss der Benutzer selbst einen Dateinamen eintippen** – es gibt keinen Vorschlag, und ohne Namen ist Speichern nicht möglich (die Endung `.svg` bzw. `.zip` steht fest daneben). Ungültige Zeichen (` / : * ? " < > |`) werden entfernt, ein leerer Name ist nicht möglich. Das gilt für die grüne Export-Taste, für „Arbeit exportieren“ in der Galerie und für beide ZIP-Exporte.
 
 - **Exportieren-Taste** (grün, oben rechts): Auf dem iPad öffnet sich das **Teilen-Menü** → „In Dateien sichern“, AirDrop, Mail … Auf dem Computer wird die Datei heruntergeladen. Dateiname: `<Kind>_<Datum>_<Uhrzeit>.svg`.
 - **Galerie**: Pfeil-Taste an jeder Arbeit = diese Arbeit exportieren; Pfeil oben rechts = **alle Arbeiten dieses Kindes als ZIP**.
@@ -135,13 +135,21 @@ Alle Werkzeugtasten haben die **Schrift unter dem Symbol** (Galerie, Zurück, Vo
 
 Neue Formen: in `src/shapes.ts` ergänzen (ID, Gruppe, Name, Geometrie); Symbol und Auswahl entstehen automatisch, `tests/shapes.test.ts` prüft sie.
 
+## Tastatur
+
+Text und Bildersuche nutzen eine Bildschirmtastatur im **deutschen Layout (QWERTZ)**: Ziffernreihe mit ß und Löschen, darunter QWERTZUIOPÜ, ASDFGHJKLÖÄ (jeweils wie auf einer echten Tastatur versetzt), YXCVBNM mit Komma, Punkt und Bindestrich, Umschalt (Groß/Klein, nur beim Text) und Leertaste. Definition: `src/keyboard.ts` (`GERMAN_ROWS`).
+
+## Größe ändern an den Ecken
+
+Mit der **Seitenverhältnis-Sperre** (Schloss, Standard) ändert das Ziehen an einer Ecke Breite und Höhe gemeinsam. Ist die Sperre **aufgehoben**, folgen Breite und Höhe dem Finger unabhängig voneinander (auch bei gedrehten Teilen) – das Teil lässt sich frei strecken. Das Schloss wirkt damit auf die Zahleneingabe und auf das Ziehen gleichermaßen. (Zwei Finger skalieren weiterhin gleichmäßig.)
+
 ## Text nachträglich ändern
 
 Ein Text-Teil antippen, dann oben die Taste **Schrift**: Es öffnet sich die Texteingabe mit dem vorhandenen Wortlaut und der aktuellen Schrift. Schrift und/oder Text ändern, ✓ – Lage, Drehung, Bearbeitungsart (Schere/Stift/Farbrolle) und die Größe, die das Kind eingestellt hat (relativ zur Standardgröße), bleiben erhalten. Der Schritt lässt sich mit „Zurück“ rückgängig machen. (Die Taste ist nur bei ausgewähltem Text aktiv.)
 
 ## Bildschirmgrößen
 
-Die Oberfläche passt sich der Fensterhöhe an (normal ab ca. 760 px, kompakt darunter, sehr kompakt unter 640 px: kleinere Tasten, Dialoge höchstens so hoch wie das Fenster, Formen-Auswahl bleibt im Fenster). Geprüft mit einem Skript, das in allen Ansichten und Dialogen (Startseite, Benutzer, Lehrkraft, Lizenzen, Galerie, Zeichenfläche wählen, Editor, Formen-Auswahl, Text, Schrift ändern, Suche, Zahlentastatur, Dateiname) überdeckte, abgeschnittene und außerhalb liegende Tasten sucht: ohne Befund bei 1366×1024, 1180×820, 1133×744, 1024×768, 1024×650, 900×600 und 800×560. Hochformat zeigt den Hinweis „Gerät drehen“.
+Die Oberfläche passt sich der Fensterhöhe an (normal ab ca. 760 px, kompakt darunter, sehr kompakt unter 640 px: kleinere Tasten, Dialoge höchstens so hoch wie das Fenster, Formen-Auswahl bleibt im Fenster). Geprüft mit einem Skript, das in allen Ansichten und Dialogen (Startseite, Benutzer, Lehrkraft, Lizenzen, Galerie, Zeichenfläche wählen, Editor, Formen-Auswahl, Text, Schrift ändern, Suche, Zahlentastatur, Dateiname) überdeckte, abgeschnittene und außerhalb liegende Tasten sucht: ohne Befund bei 1366×1024, 1180×820, 1133×744, 1024×768, 1024×650, 900×600 und 800×560. Zusätzlich gibt es eine **ultra-kompakte** Stufe unter 540 px Höhe (z. B. Computer mit 150–200 % Skalierung): ohne Befund bei 960×480, 1280×600 und 1920×960. Bei vielen Benutzern/Arbeiten (13 Benutzer, 9 Arbeiten geprüft) überdeckt nichts mehr die Karten: Das Info-Symbol sitzt oben rechts im Kopfbereich statt unten links über der Kartenliste. Hochformat zeigt den Hinweis „Gerät drehen“.
 
 ## Text und Schriftarten
 

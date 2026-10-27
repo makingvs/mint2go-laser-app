@@ -2020,3 +2020,205 @@ input {
     grid-template-columns: repeat(4, 1fr);
   }
 }
+
+/* =====================================================================
+   Deutsche Tastatur (QWERTZ), 48-Spalten-Raster, Reihen versetzt
+   ===================================================================== */
+.kb {
+  display: grid;
+  grid-template-columns: repeat(48, 1fr);
+  grid-auto-rows: var(--key-h);
+  align-content: start;
+  flex: none;
+  min-height: 0;
+}
+.kb .key {
+  margin: 3px;
+  min-width: 0;
+  padding: 0;
+  width: auto;
+  height: auto;
+}
+.search-kb {
+  width: clamp(420px, 58%, 600px);
+  --key-h: 50px;
+}
+.search-kb .key {
+  font-size: 22px;
+}
+.search-body .search-results {
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+}
+
+/* =====================================================================
+   Startseite/Galerie: Info-Symbol im Kopfbereich (nicht mehr über den Karten),
+   kompaktere Karten und Logo bei niedrigen Fenstern
+   ===================================================================== */
+.info-btn {
+  left: auto !important;
+  bottom: auto !important;
+  top: calc(var(--safe-t) + 18px);
+  right: calc(var(--safe-r) + 22px);
+}
+@media (max-height: 760px) {
+  .logo-img {
+    width: min(400px, 60vw);
+  }
+  .card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    grid-auto-rows: 168px;
+    gap: 14px;
+  }
+  .profile-card .emoji {
+    font-size: 66px;
+  }
+  .profile-card .cap {
+    font-size: 22px;
+  }
+  .screen {
+    gap: 10px;
+    padding-top: calc(var(--safe-t) + 10px);
+  }
+}
+@media (max-height: 640px) {
+  .logo-img {
+    width: min(290px, 50vw);
+  }
+  .card-grid {
+    grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+    grid-auto-rows: 142px;
+    gap: 12px;
+  }
+  .profile-card .emoji {
+    font-size: 52px;
+  }
+  .profile-card .cap {
+    font-size: 19px;
+    margin-top: 4px;
+  }
+  .add-card .icon {
+    width: 48px;
+    height: 48px;
+  }
+  .info-btn {
+    top: calc(var(--safe-t) + 10px);
+    width: 46px;
+    height: 46px;
+  }
+}
+
+/* =====================================================================
+   Ultra-kompakt (< 540 px Höhe): z. B. Computer mit 150–200 % Skalierung
+   ===================================================================== */
+@media (max-height: 540px) {
+  :root {
+    --tb-h: 60px;
+    --lb-h: 46px;
+    --lb-w: 52px;
+    --ico: 20px;
+    --lbl: 10.5px;
+    --rail-w: 58px;
+    --op-h: 56px;
+    --op-w: 70px;
+    --op-ico: 24px;
+    --zoom-h: 38px;
+    --zoom-ico: 16px;
+    --dims-h: 42px;
+    --key-h: 38px;
+    --np-key-h: 40px;
+  }
+  .btn.labeled {
+    gap: 1px;
+    padding: 3px 4px 2px;
+  }
+  .btn .lbl {
+    letter-spacing: 0;
+  }
+  .btn.op .lbl {
+    font-size: 11px;
+  }
+  .rail-group {
+    padding: 4px 4px 4px;
+    gap: 3px;
+    border-top-width: 3px;
+    border-radius: 18px;
+  }
+  .left-rail {
+    gap: 5px;
+  }
+  .right-rail {
+    gap: 4px;
+    width: 80px;
+  }
+  .zoom-box {
+    gap: 3px;
+    padding-top: 4px;
+  }
+  .editor-body {
+    padding: 8px 10px 6px;
+    gap: 8px;
+  }
+  .dim {
+    height: 36px;
+    font-size: 16px;
+    padding: 0 8px;
+  }
+  .dim-ico {
+    width: 18px;
+    height: 18px;
+  }
+  .topbar .cd-wrap.top-line {
+    bottom: -7px;
+  }
+  .surface-preview {
+    height: min(260px, 26vh);
+  }
+  .tile {
+    max-height: 64px;
+  }
+  .panel {
+    padding: 10px;
+    gap: 8px;
+    border-radius: 22px;
+  }
+  .btn {
+    border-radius: 14px;
+  }
+  .text-preview {
+    height: 52px;
+  }
+  .font-chip {
+    height: 38px;
+    font-size: 20px;
+  }
+  .font-chip svg {
+    height: 22px;
+    width: 56px;
+  }
+  .numpad {
+    padding: 12px;
+    gap: 8px;
+  }
+  .np-display {
+    height: 48px;
+    font-size: 30px;
+  }
+  .np-keys .key {
+    margin: 0;
+  }
+  .big-btn {
+    height: 52px;
+    width: 90px;
+  }
+}
+.surface-panel {
+  overflow-y: auto;
+}
+
+/* Symbole in Tasten wachsen nie über die Taste hinaus */
+.key .icon {
+  height: 62%;
+  width: auto;
+  aspect-ratio: 1;
+  max-height: 40px;
+}

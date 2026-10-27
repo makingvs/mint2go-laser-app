@@ -1,4 +1,5 @@
-// Dialog "Dateiname festlegen": Vor jedem Export/Download bestimmt der Benutzer den Namen der Datei.
+// Dialog "Dateiname festlegen": Vor jedem Export/Download muss der Benutzer selbst einen Namen für die
+// Datei eintippen (es gibt keinen Vorschlag; ohne Namen ist Speichern nicht möglich).
 // Die Speicherung wird direkt im Tipp auf ✓ gestartet, weil das Teilen-Menü (iPad) nur aus einer
 // Benutzeraktion heraus geöffnet werden darf.
 import { button, h, overlay } from './dom';
@@ -6,8 +7,6 @@ import { ICONS } from './icons';
 import { sanitizeFileName } from './names';
 
 export interface SaveDialogOptions {
-  /** Vorschlag für den Namen (mit oder ohne Endung) */
-  defaultName: string;
   /** Dateiendung ohne Punkt, z. B. "svg" oder "zip" */
   ext: 'svg' | 'zip';
   /** Symbol im Kopf des Dialogs */
@@ -26,7 +25,8 @@ export function openSaveDialog(o: SaveDialogOptions): void {
   input.autocomplete = 'off';
   input.spellcheck = false;
   input.setAttribute('aria-label', 'Dateiname');
-  input.value = o.defaultName.replace(new RegExp(`\\.${o.ext}$`, 'i'), '');
+  input.value = ''; // bewusst leer: Der Benutzer muss immer selbst einen Namen festlegen
+  input.placeholder = 'Dateiname';
   const suffix = h('span', 'save-ext', `.${o.ext}`);
 
   const ok = button('btn send', ICONS.check, () => confirm(), 'Speichern');
