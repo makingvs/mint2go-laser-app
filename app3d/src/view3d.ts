@@ -5,8 +5,7 @@ import * as THREE from 'three';
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Bed } from './bed';
 import { closestZOnVertical, rayPlaneZ, resizeFromGround, resizeHeight, rotateFromGround } from './gizmo';
-import { unitMesh, type PartKind } from './mesh';
-import { snap, type Part } from './model3d';
+import { meshOf, snap, type Part } from './model3d';
 import { FOV_DEG, cameraPosition, defaultOrbit, orbitPan, orbitRotate, orbitZoom, type Orbit, type Vec3 } from './orbit';
 
 const COLORS = {
@@ -25,6 +24,9 @@ const COLORS = {
 
 const HANDLE_PX = 15; // sichtbarer Radius der Griffe in Pixeln
 const HIT_PX = 34; // Trefferradius (Finger sind dick)
+
+/** Gleiche Schlüssel = gleiche Form (Grundkörper nach Art, gezeichnete Körper nach Umriss-Nummer). */
+const geometryKey = (p: Part): string => (p.kind === 'extrude' ? `x:${p.outline?.id}` : p.kind);
 
 type DragKind = 'move' | 'size' | 'height' | 'rotate';
 
@@ -53,7 +55,7 @@ export class View3d {
   private bedGroup = new THREE.Group();
   private partGroup = new THREE.Group();
   private meshes = new Map<string, THREE.Mesh>();
-  private geometries = new Map<PartKind, THREE.BufferGeometry>();
+  private geometries = new Map<string, THREE.BufferGeometry>();
   private mats = {
     part: new THREE.MeshStandardMaterial({ color: COLORS.part, roughness: 0.55 }),
     selected: new THREE.MeshStandardMaterial({ color: COLORS.selected, roughness: 0.55 }),
@@ -140,15 +142,15 @@ export class View3d {
     for (const p of parts) {
       let m = this.meshes.get(p.id);
       if (!m) {
-        m = new THREE.Mesh(this.geometryFor(p.kind), this.mats.part);
+        m = new THREE.Mesh(this.geometryFor(p), this.mats.part);
         m.userData.id = p.id;
-        m.userData.kind = p.kind;
+        m.userData.key = geometryKey(p);
         this.meshes.set(p.id, m);
         this.partGroup.add(m);
       }
-      if (m.userData.kind !== p.kind) {
-        m.geometry = this.geometryFor(p.kind);
-        m.userData.kind = p.kind;
+      if (m.userData.key !== geometryKey(p)) {
+        m.geometry = this.geometryFor(p);
+        m.userData.key = geometryKey(p);
       }
       m.position.set(p.x, p.y, p.z);
       m.rotation.z = (p.rot * Math.PI) / 180;
@@ -166,16 +168,17 @@ export class View3d {
   }
 
   // ---------- Aufbau ----------
-  private geometryFor(kind: PartKind): THREE.BufferGeometry {
-    let g = this.geometries.get(kind);
+  private geometryFor(p: Part): THREE.BufferGeometry {
+    const key = geometryKey(p);
+    let g = this.geometries.get(key);
     if (!g) {
-      const m = unitMesh(kind);
+      const m = meshOf(p);
       const base = new THREE.BufferGeometry();
       base.setAttribute('position', new THREE.Float32BufferAttribute(m.pos, 3));
       base.setIndex(m.idx);
       g = toCreasedNormals(base, (35 * Math.PI) / 180); // Kanten bleiben scharf, Rundungen glatt
       base.dispose();
-      this.geometries.set(kind, g);
+      this.geometries.set(key, g);
     }
     return g;
   }

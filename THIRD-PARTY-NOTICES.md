@@ -59,5 +59,5 @@ Vite, TypeScript, Vitest, @types/node (MIT bzw. Apache 2.0). Der QR-Code `docs/i
 ## 3D-Druck-App (`app3d/`)
 
 Die 3D-Ansicht nutzt [three.js](https://threejs.org) (MIT, © 2010-2024 three.js authors, Lizenztext:
-`app3d/public/licenses/three.txt`, wird mit der 3D-App ausgeliefert). Die Schrift Jost (OFL 1.1) liegt dort ebenfalls
-bei (`app3d/public/licenses/font-jost.txt`). Geometrie, Mesh-Erzeugung und Export sind selbst geschrieben.
+`app3d/public/licenses/three.txt`, wird mit der 3D-App ausgeliefert). Die Schriften der Text-Funktion (Jost, Fredoka, Baloo 2, Rubik Mono One, Bangers, Caveat, Pacifico; alle OFL 1.1, Angaben
+wie in der Tabelle oben) liegen mit ihren Lizenztexten bei (`app3d/public/licenses/font-*.txt`). Geometrie, Mesh-Erzeugung und Export sind selbst geschrieben.

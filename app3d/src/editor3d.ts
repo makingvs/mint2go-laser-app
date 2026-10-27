@@ -1,12 +1,14 @@
 // Editor der 3D-App: Körper-Leiste, 3D-Ansicht, Maße-Leiste, Rückgängig.
-import { button, confirmDialog, h, lab } from '../../src/dom';
+import { button, confirmDialog, h, lab, overlay } from '../../src/dom';
 import { ICONS } from '../../src/icons';
 import { formatNumber, openNumpad } from '../../src/numpad';
+import type { Shape } from '../../src/geometry';
 import type { PrinterSettings } from './bed';
+import { openKindPicker, openShapePicker, openSketch, openTextDialog, pickSvg } from './dialogs3d';
 import { History } from './history';
 import { ICONS3D, KIND_ICONS } from './icons3d';
-import { KIND_LABELS, PART_KINDS, type PartKind } from './mesh';
-import { MAX_SIZE, MIN_SIZE, applyDim, centered, cloneParts, createPart, duplicatePart, findFreeSpot, isOutside, type DimField, type Part } from './model3d';
+import type { PartKind } from './mesh';
+import { MAX_SIZE, MIN_SIZE, applyDim, centered, cloneParts, createPart, duplicatePart, findFreeSpot, isOutside, makeOutlinePart, type DimField, type OutlineSize, type Part } from './model3d';
 import { View3d } from './view3d';
 
 const DIMS: { field: DimField; icon: string; unit: string; label: string }[] = [
@@ -16,6 +18,15 @@ const DIMS: { field: DimField; icon: string; unit: string; label: string }[] = [
   { field: 'rot', icon: ICONS.rotate, unit: '°', label: 'Drehung' },
   { field: 'z', icon: ICONS3D.lift, unit: 'mm', label: 'Abstand zum Bett' },
 ];
+
+/** Kurzer Hinweis ohne Text: großes Symbol, verschwindet von selbst oder beim Antippen. */
+function notify(iconHtml: string): void {
+  const o = overlay('overlay-dim');
+  o.root.append(h('div', 'confirm-card', `<div class="confirm-icon">${iconHtml}</div>`));
+  const close = () => o.close();
+  o.root.addEventListener('click', close);
+  setTimeout(close, 1800);
+}
 
 export class Editor3d {
   readonly root = h('div', 'editor3d');
@@ -49,7 +60,15 @@ export class Editor3d {
 
     const body = h('div', 'editor-body');
     const rail = h('div', 'rail left-rail');
-    for (const kind of PART_KINDS) rail.append(button('btn labeled tool', lab(KIND_ICONS[kind], KIND_LABELS[kind]), () => this.add(kind), KIND_LABELS[kind]));
+    // Körper aus der Auswahl; Zeichnen: Umriss festlegen, danach die Höhe geben
+    rail.append(
+      button('btn labeled tool', lab(KIND_ICONS.box, 'Körper'), () => void this.pickKind(), 'Körper'),
+      h('div', 'rail-sep'),
+      button('btn labeled tool', lab(ICONS.shapes, 'Formen'), () => void this.drawShape(), 'Formen'),
+      button('btn labeled tool', lab(ICONS.draw, 'Freihand'), () => void this.drawSketch(), 'Freihand'),
+      button('btn labeled tool', lab(ICONS.text, 'Text'), () => void this.drawText(), 'Text'),
+      button('btn labeled tool', lab(ICONS.svgUp, 'SVG'), () => this.drawSvg(), 'SVG-Datei'),
+    );
 
     const stage = h('div', 'stage');
     const host = h('div', 'view-host');
@@ -125,6 +144,48 @@ export class Editor3d {
     const p = createPart(kind, spot.x, spot.y);
     this.parts = [...this.parts, p];
     this.selectedId = p.id;
+    this.commit();
+  }
+
+  private async pickKind(): Promise<void> {
+    const kind = await openKindPicker();
+    if (kind) this.add(kind);
+  }
+
+  // ---------- Zeichnen: Umriss -> Körper mit Höhe ----------
+  private async drawShape(): Promise<void> {
+    const r = await openShapePicker();
+    if (r) await this.addDrawn(r.shape, { longest: 40 }, 10);
+  }
+
+  private async drawSketch(): Promise<void> {
+    const shape = await openSketch();
+    if (shape) await this.addDrawn(shape, { longest: 50 }, 8);
+  }
+
+  private async drawText(): Promise<void> {
+    const r = await openTextDialog();
+    if (r) await this.addDrawn(r.shape, { scale: r.scale }, 5);
+  }
+
+  private drawSvg(): void {
+    pickSvg(
+      (shape) => void this.addDrawn(shape, { longest: 50 }, 8),
+      () => notify(ICONS.warn),
+    );
+  }
+
+  /** Umriss als Körper auf freien Platz setzen, dann nach der Höhe fragen (Abbrechen behält die Starthöhe). */
+  private async addDrawn(shape: Shape, size: OutlineSize, height: number): Promise<void> {
+    const probe = makeOutlinePart(shape, size, height, this.printer.bed);
+    if (!probe) return notify(ICONS.warn);
+    const spot = findFreeSpot(probe, this.parts, this.printer.bed);
+    const p = { ...probe, x: spot.x, y: spot.y };
+    this.parts = [...this.parts, p];
+    this.selectedId = p.id;
+    this.refresh();
+    const v = await openNumpad({ icon: ICONS.arrowV, value: p.h, unit: 'mm', min: MIN_SIZE, max: this.printer.bed.height });
+    if (v !== null) this.replace(p.id, applyDim(p, 'h', v, false, this.printer.bed)); // nur die Höhe, nicht gleichmäßig
     this.commit();
   }
 

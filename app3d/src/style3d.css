@@ -505,3 +505,223 @@ button {
   .dim-lbl { display: none; }
   .dim { min-width: 0; padding: 0 6px; }
 }
+
+/* ---------- Webschriften für Text (SIL OFL 1.1, Lizenztexte in public/licenses/) ---------- */
+@font-face { font-family: 'Fredoka Variable'; font-style: normal; font-display: swap; font-weight: 300 700; src: url('../../node_modules/@fontsource-variable/fredoka/files/fredoka-latin-wght-normal.woff2') format('woff2-variations'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122; }
+@font-face { font-family: 'Baloo 2 Variable'; font-style: normal; font-display: swap; font-weight: 400 800; src: url('../../node_modules/@fontsource-variable/baloo-2/files/baloo-2-latin-wght-normal.woff2') format('woff2-variations'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122; }
+@font-face { font-family: 'Caveat Variable'; font-style: normal; font-display: swap; font-weight: 400 700; src: url('../../node_modules/@fontsource-variable/caveat/files/caveat-latin-wght-normal.woff2') format('woff2-variations'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122; }
+@font-face { font-family: 'Rubik Mono One'; font-style: normal; font-display: swap; font-weight: 400; src: url('../../node_modules/@fontsource/rubik-mono-one/files/rubik-mono-one-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122; }
+@font-face { font-family: 'Bangers'; font-style: normal; font-display: swap; font-weight: 400; src: url('../../node_modules/@fontsource/bangers/files/bangers-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122; }
+@font-face { font-family: 'Pacifico'; font-style: normal; font-display: swap; font-weight: 400; src: url('../../node_modules/@fontsource/pacifico/files/pacifico-latin-400-normal.woff2') format('woff2'); unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122; }
+
+/* ---------- Zeichnen: Fenster mit Formen, Skizze, Text ---------- */
+:root { --key-h: 64px; }
+@media (max-height: 800px) { :root { --key-h: 54px; } }
+@media (max-height: 640px) { :root { --key-h: 42px; } }
+@media (max-height: 540px) { :root { --key-h: 34px; } }
+
+.rail-sep {
+  height: 2px;
+  width: 36px;
+  background: var(--line);
+  flex: none;
+  margin: 2px 0;
+}
+.btn.tool.active {
+  background: var(--blue-tint);
+  box-shadow: 0 0 0 3px var(--blue) inset;
+}
+.panel {
+  background: var(--panel);
+  border-radius: 26px;
+  padding: 16px;
+  width: min(960px, 100%);
+  max-height: calc(100vh - 20px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+  animation: pop 0.2s;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.panel-head .spacer {
+  flex: 1;
+}
+.btn.key-ok {
+  width: 100px;
+  background: var(--m-green);
+  color: #fff;
+}
+.btn.key-ok:disabled {
+  opacity: 0.35;
+}
+.shape-panel {
+  width: min(560px, 100%);
+  overflow-y: auto;
+}
+.shape-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+.shape-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 3px solid transparent;
+  border-image: linear-gradient(90deg, var(--m-green), var(--m-orange), var(--m-pink)) 1;
+}
+.shape-grid:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.shape-grid .btn {
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  max-height: 72px;
+  border-radius: 18px;
+}
+.sketch-panel {
+  width: min(900px, 100%);
+}
+.sketch-tools {
+  display: flex;
+  gap: 8px;
+}
+.sketch-pad {
+  width: 100%;
+  aspect-ratio: 3 / 2;
+  max-height: calc(100vh - 150px);
+  align-self: center;
+  border-radius: 16px;
+  box-shadow: 0 0 0 2px var(--line) inset;
+  touch-action: none;
+  background: #fff;
+}
+.text-panel {
+  overflow: hidden;
+}
+.text-preview {
+  flex: 1;
+  height: 100px;
+  border-radius: 16px;
+  background: var(--soft);
+  box-shadow: 0 0 0 2px var(--line) inset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+  min-width: 0;
+}
+.text-preview svg {
+  max-width: 100%;
+  max-height: 100%;
+  height: 100%;
+}
+.cursor {
+  width: 4px;
+  height: 50px;
+  background: var(--blue);
+  animation: pulse 1s infinite;
+}
+.font-preview {
+  white-space: nowrap;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.font-row {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 8px;
+}
+@media (max-width: 880px) {
+  .font-row { grid-template-columns: repeat(4, 1fr); }
+}
+.font-chip {
+  min-width: 0;
+  height: 54px;
+  padding: 0 8px;
+  border-radius: 18px;
+  background: var(--soft);
+  box-shadow: 0 0 0 2px var(--line) inset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+  line-height: 1;
+}
+.font-chip svg {
+  height: 30px;
+  width: 70px;
+}
+.font-chip.active {
+  background: var(--blue-tint);
+  box-shadow: 0 0 0 3px var(--m-blue) inset;
+}
+@media (max-height: 640px) {
+  .font-chip { height: 40px; font-size: 20px; }
+  .font-chip svg { height: 22px; width: 56px; }
+  .text-preview { height: 64px; }
+  .panel { padding: 10px; gap: 8px; }
+}
+.kb {
+  display: grid;
+  grid-template-columns: repeat(48, 1fr);
+  grid-auto-rows: var(--key-h);
+  align-content: start;
+  flex: none;
+  min-height: 0;
+}
+.kb .key {
+  margin: 3px;
+  min-width: 0;
+  padding: 0;
+  width: auto;
+  height: auto;
+  font-size: clamp(16px, calc(var(--key-h) * 0.5), 30px);
+}
+.key .icon {
+  height: 62%;
+  width: auto;
+  aspect-ratio: 1;
+  max-height: 40px;
+}
+.key.shift.active {
+  background: var(--blue-tint);
+  color: #1b8fc2;
+  box-shadow: 0 0 0 3px var(--m-blue) inset;
+}
+.spinner {
+  width: 110px;
+  height: 110px;
+  color: var(--m-blue);
+  animation: pulse 1s infinite;
+}
+.spinner .icon {
+  width: 100%;
+  height: 100%;
+}
+.kind-panel {
+  width: min(640px, 100%);
+}
+.kind-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.kind-grid .btn.labeled {
+  width: 100%;
+  min-width: 0;
+  height: calc(var(--lb-h) + 22px);
+}
+.kind-grid .btn.labeled .ico {
+  width: calc(var(--ico) + 10px);
+  height: calc(var(--ico) + 10px);
+}

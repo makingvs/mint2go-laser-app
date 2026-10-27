@@ -1,10 +1,20 @@
 // Körper auf dem Druckbett (reine Rechnung). Maße in mm, Koordinaten wie in bed.ts (Ursprung Mitte Bett, z oben).
+import type { Shape } from '../../src/geometry';
 import { fitsInBuildVolume, type Bed, type Box3 } from './bed';
-import { KIND_SIZE, unitMesh, type PartKind } from './mesh';
+import { normalizeOutline, outlineMesh } from './extrude';
+import { KIND_SIZE, unitMesh, type PartKind, type TriMesh } from './mesh';
+
+/** Umriss eines gezeichneten Körpers (normiert, siehe extrude.ts); die Nummer dient dem Zwischenspeicher. */
+export interface Outline {
+  id: string;
+  rings: Shape;
+}
 
 export interface Part {
   id: string;
-  kind: PartKind;
+  /** Grundkörper oder 'extrude' = gezeichneter Umriss mit Höhe */
+  kind: PartKind | 'extrude';
+  outline?: Outline;
   x: number; // Mitte, mm
   y: number;
   z: number; // Abstand des Bodens zum Bett (0 = liegt auf dem Bett)
@@ -40,9 +50,40 @@ export function createPart(kind: PartKind, x = 0, y = 0): Part {
   return { id: newId(), kind, x, y, z: 0, w, d, h, rot: 0 };
 }
 
+export type OutlineSize = { longest: number } | { scale: number };
+
+/**
+ * Körper aus einem gezeichneten Umriss (Form aus der Laser-App: y nach unten, beliebige Einheit).
+ * `size`: längste Seite in mm oder mm pro Einheit. Die Größe wird auf das Bett begrenzt. null bei leerer Form.
+ */
+export function makeOutlinePart(source: Shape, size: OutlineSize, height: number, bed: Bed, x = 0, y = 0): Part | null {
+  const n = normalizeOutline(source);
+  if (!n) return null;
+  let s = 'scale' in size ? size.scale : size.longest / Math.max(n.w, n.d);
+  s = Math.max(s, MIN_SIZE / Math.min(n.w, n.d)); // dünnste Seite mindestens MIN_SIZE ...
+  s = Math.min(s, (Math.min(bed.width, bed.depth) * 0.9) / Math.max(n.w, n.d)); // ... aber nie größer als das Bett
+  return {
+    id: newId(),
+    kind: 'extrude',
+    outline: { id: newId(), rings: n.outline },
+    x,
+    y,
+    z: 0,
+    w: round1(Math.max(MIN_SIZE, n.w * s)),
+    d: round1(Math.max(MIN_SIZE, n.d * s)),
+    h: round1(clamp(height, MIN_SIZE, Math.max(MIN_SIZE, bed.height))),
+    rot: 0,
+  };
+}
+
+/** Netz im Einheitsquader zu diesem Körper. */
+export function meshOf(p: Part): TriMesh {
+  return p.kind === 'extrude' && p.outline ? outlineMesh(p.outline.id, p.outline.rings) : unitMesh(p.kind === 'extrude' ? 'box' : p.kind);
+}
+
 /** Eckpunkte des Körpers im Raum (Netz skaliert, gedreht, verschoben). */
 export function worldVertices(p: Part): number[] {
-  const m = unitMesh(p.kind);
+  const m = meshOf(p);
   const a = (p.rot * Math.PI) / 180;
   const c = Math.cos(a);
   const s = Math.sin(a);
@@ -104,8 +145,8 @@ export function withSize(p: Part, w: number, d: number, h: number): Part {
 export { limitFactor };
 
 /** Freier Platz für einen neuen Körper: so nah wie möglich an der Mitte, ohne Überlappung in der Draufsicht. */
-export function findFreeSpot(kind: PartKind, parts: Part[], bed: Bed, gap = 4): { x: number; y: number } {
-  const probe = createPart(kind);
+export function findFreeSpot(what: PartKind | Part, parts: Part[], bed: Bed, gap = 4): { x: number; y: number } {
+  const probe = typeof what === 'string' ? createPart(what) : { ...what, x: 0, y: 0, rot: 0 };
   const step = 10;
   const half = Math.max(probe.w, probe.d) / 2;
   const boxes = parts.map(partBounds);

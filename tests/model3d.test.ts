@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { History } from '../app3d/src/history';
 import { PART_KINDS } from '../app3d/src/mesh';
-import { MAX_SIZE, MIN_SIZE, applyDim, createPart, duplicatePart, findFreeSpot, isOutside, normalizeRot, partBounds, snap } from '../app3d/src/model3d';
+import { MAX_SIZE, MIN_SIZE, applyDim, createPart, duplicatePart, findFreeSpot, isOutside, makeOutlinePart, normalizeRot, partBounds, snap } from '../app3d/src/model3d';
 
 const bed = { width: 200, depth: 200, height: 100 };
 
@@ -103,5 +103,50 @@ describe('Rückgängig', () => {
     expect(h.undo()).toEqual([1, 2]);
     expect(h.undo()).toEqual([1]);
     expect(h.undo()).toBeNull();
+  });
+});
+
+describe('Gezeichnete Körper (Umriss mit Höhe)', () => {
+  const bed2 = { width: 200, depth: 200, height: 100 };
+  const rect = (w: number, h: number): [number, number][] => [[0, 0], [w, 0], [w, h], [0, h]];
+
+  it('längste Seite wird auf die gewünschte Länge gebracht, die Höhe stimmt', () => {
+    const p = makeOutlinePart([rect(20, 10)], { longest: 40 }, 8, bed2)!;
+    expect(p.kind).toBe('extrude');
+    expect([p.w, p.d, p.h]).toEqual([40, 20, 8]);
+    const b = partBounds(p);
+    expect(b.min[2]).toBe(0);
+    expect(b.max[2]).toBeCloseTo(8, 9);
+    expect(b.max[0] - b.min[0]).toBeCloseTo(40, 6);
+    expect(b.max[1] - b.min[1]).toBeCloseTo(20, 6);
+  });
+
+  it('Maßstab statt Länge (Text)', () => {
+    const p = makeOutlinePart([rect(20, 10)], { scale: 2 }, 5, bed2)!;
+    expect([p.w, p.d]).toEqual([40, 20]);
+  });
+
+  it('wird aufs Bett begrenzt und nicht unter das Mindestmaß gedrückt', () => {
+    const big = makeOutlinePart([rect(20, 10)], { longest: 5000 }, 8, bed2)!;
+    expect(big.w).toBeLessThanOrEqual(180);
+    const tiny = makeOutlinePart([rect(20, 10)], { longest: 0.1 }, 8, bed2)!;
+    expect(Math.min(tiny.w, tiny.d)).toBeGreaterThanOrEqual(MIN_SIZE);
+  });
+
+  it('Höhe wird begrenzt, leere Form ergibt nichts', () => {
+    expect(makeOutlinePart([rect(20, 10)], { longest: 40 }, 5000, bed2)!.h).toBe(100);
+    expect(makeOutlinePart([rect(20, 10)], { longest: 40 }, 0, bed2)!.h).toBe(MIN_SIZE);
+    expect(makeOutlinePart([], { longest: 40 }, 8, bed2)).toBeNull();
+  });
+
+  it('Maße, Drehen und freier Platz funktionieren auch für gezeichnete Körper', () => {
+    const a = makeOutlinePart([rect(20, 10)], { longest: 40 }, 8, bed2)!;
+    expect(applyDim(a, 'h', 20, false, bed2).h).toBe(20);
+    const spot = findFreeSpot(a, [{ ...a, x: 0, y: 0 }], bed2);
+    const b = { ...a, ...spot };
+    const ba = partBounds({ ...a, x: 0, y: 0 });
+    const bb = partBounds(b);
+    expect(ba.max[0] > bb.min[0] && ba.min[0] < bb.max[0] && ba.max[1] > bb.min[1] && ba.min[1] < bb.max[1]).toBe(false);
+    expect(isOutside(b, bed2)).toBe(false);
   });
 });
