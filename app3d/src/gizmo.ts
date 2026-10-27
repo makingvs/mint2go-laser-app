@@ -43,14 +43,17 @@ export function resizeFromGround(start: Part, grab: [number, number], now: [numb
   return withSize(start, w, d, start.h);
 }
 
-/** Höhen-Griff: die Höhe ändert sich um dz. Mit `lock` wächst alles im gleichen Verhältnis. */
+/**
+ * Höhen-Griff: die Höhe ändert sich um dz.
+ * Mit `lock` wächst alles im gleichen Verhältnis; der Faktor richtet sich nach dem größten Maß,
+ * damit flache Körper (z. B. der Ring) nicht bei kleinem Ziehen riesig werden.
+ */
 export function resizeHeight(start: Part, dz: number, lock: boolean): Part {
-  const h = Math.max(MIN_SIZE, start.h + dz);
   if (lock) {
-    const f = limitFactor(start, h / start.h);
+    const f = limitFactor(start, 1 + dz / Math.max(start.w, start.d, start.h));
     return withSize(start, start.w * f, start.d * f, start.h * f);
   }
-  return withSize(start, start.w, start.d, h);
+  return withSize(start, start.w, start.d, Math.max(MIN_SIZE, start.h + dz));
 }
 
 /** Dreh-Griff: der Körper dreht sich um den Winkel, den der Finger um die Mitte zurückgelegt hat (rastet auf `snapDeg` ein). */

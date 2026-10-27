@@ -60,6 +60,16 @@ describe('Griffe: Größe, Höhe, Drehen', () => {
     expect(resizeHeight(box, -1000, false).h).toBe(MIN_SIZE);
   });
 
+  it('Höhen-Griff mit Schloss: flache Körper werden bei kleinem Ziehen nicht riesig', () => {
+    const ring = { ...createPart('ring'), w: 40, d: 40, h: 10 };
+    const r = resizeHeight(ring, 30, true); // 30 mm Ziehen bei größtem Maß 40 -> Faktor 1,75
+    expect(r.w).toBeCloseTo(70, 9);
+    expect(r.h).toBeCloseTo(17.5, 9);
+    const small = resizeHeight(ring, -1000, true); // schrumpft höchstens bis zum Mindestmaß
+    expect(Math.min(small.w, small.d, small.h)).toBeCloseTo(MIN_SIZE, 6);
+    expect(small.w / small.h).toBeCloseTo(4, 6);
+  });
+
   it('Dreh-Griff folgt dem Finger und rastet auf 5° ein', () => {
     // Finger startet rechts von der Mitte (Winkel 0) und geht nach oben (Winkel 90°)
     const r = rotateFromGround(box, [30, 20], [10, 40], 5);
