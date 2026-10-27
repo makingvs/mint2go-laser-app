@@ -63,3 +63,20 @@ export function rotateFromGround(start: Part, grab: [number, number], now: [numb
   const deg = start.rot + ((a1 - a0) * 180) / Math.PI;
   return { ...start, rot: normalizeRot(snapDeg > 0 ? Math.round(deg / snapDeg) * snapDeg : deg) };
 }
+
+/** Stelle auf dem Körper, an der der Anheben-Griff sitzt: Mitte der linken Seitenwand (Weltkoordinaten x, y). */
+export function liftHandleXY(p: Pick<Part, 'x' | 'y' | 'rot' | 'w'>): [number, number] {
+  const a = (p.rot * Math.PI) / 180;
+  return [p.x - (p.w / 2) * Math.cos(a), p.y - (p.w / 2) * Math.sin(a)];
+}
+
+/**
+ * Anheben-Griff: der Körper wandert um dz nach oben/unten (ganze mm, nie unter das Bett, nie über die Bauhöhe).
+ * In der Nähe der Fläche, auf der er aufliegen würde (`support`), rastet er dort ein.
+ */
+export function liftZ(startZ: number, dz: number, height: number, support: number, bedHeight: number, snapMm = 2): number {
+  let z = Math.round(startZ + dz);
+  z = Math.min(Math.max(0, bedHeight - height), Math.max(0, z));
+  if (Math.abs(z - support) <= snapMm) z = support;
+  return z;
+}

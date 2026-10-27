@@ -12,6 +12,7 @@ import { ICONS3D, KIND_ICONS } from './icons3d';
 import type { PartKind } from './mesh';
 import { MAX_SIZE, MIN_SIZE, applyDim, centered, cloneParts, createPart, duplicatePart, findFreeSpot, isOutside, makeOutlinePart, type DimField, type OutlineSize, type Part } from './model3d';
 import { storage, type Design, type ExportFormat, type Profile, type Settings } from './storage3d';
+import { restOn, supportHeight } from './support';
 import { View3d } from './view3d';
 
 export interface EditorOptions {
@@ -303,7 +304,11 @@ export class Editor3d {
   private centerSelected(): void {
     const p = this.selected();
     if (!p) return;
-    this.replace(p.id, centered(p));
+    // lag der Körper auf etwas (z. B. Text auf einem Quader), landet er in der Mitte auf dem, was dort ist
+    const others = this.parts.filter((q) => q.id !== p.id);
+    const resting = Math.abs(p.z - supportHeight(p, others, p)) < 0.05;
+    const moved = centered(p);
+    this.replace(p.id, resting ? restOn(moved, others, p) : moved);
     this.commit();
   }
 

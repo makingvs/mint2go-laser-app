@@ -4,8 +4,9 @@
 import * as THREE from 'three';
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Bed } from './bed';
-import { closestZOnVertical, rayPlaneZ, resizeFromGround, resizeHeight, rotateFromGround } from './gizmo';
+import { closestZOnVertical, liftHandleXY, liftZ, rayPlaneZ, resizeFromGround, resizeHeight, rotateFromGround } from './gizmo';
 import { meshOf, partBounds, snap, type Part } from './model3d';
+import { snapToCenters, supportHeight } from './support';
 import { FOV_DEG, cameraPosition, defaultOrbit, orbitPan, orbitRotate, orbitZoom, type Orbit, type Vec3 } from './orbit';
 
 const COLORS = {
@@ -21,6 +22,7 @@ const COLORS = {
   hSize: 0xf0a030,
   hHeight: 0x38b8e8,
   hRotate: 0xe01070,
+  hLift: 0x3a9d23,
 };
 
 const HANDLE_PX = 15; // sichtbarer Radius der Griffe in Pixeln
@@ -29,7 +31,7 @@ const HIT_PX = 34; // Trefferradius (Finger sind dick)
 /** Gleiche Schlüssel = gleiche Form (Grundkörper nach Art, gezeichnete Körper nach Umriss-Nummer). */
 const geometryKey = (p: Part): string => (p.kind === 'extrude' ? `x:${p.outline?.id}` : p.kind === 'mesh' ? `m:${p.meshId}` : p.kind);
 
-type DragKind = 'move' | 'size' | 'height' | 'rotate';
+type DragKind = 'move' | 'size' | 'height' | 'rotate' | 'lift';
 
 export interface ViewHooks {
   select(id: string | null): void;
@@ -44,7 +46,8 @@ interface Drag {
   id: string;
   start: Part;
   grab: [number, number]; // Bodenpunkt beim Start (Ebene z = start.z)
-  grabZ: number; // Höhe auf der senkrechten Linie beim Start (Höhen-Griff)
+  grabZ: number; // Höhe auf der senkrechten Linie beim Start (Höhen- und Anheben-Griff)
+  resting: boolean; // Verschieben: liegt der Körper auf dem, was unter ihm ist? Dann fällt er beim Schieben auf die neue Auflage
   offset: [number, number]; // Verschieben: Abstand zwischen Mitte und Bodenpunkt
 }
 
@@ -70,6 +73,9 @@ export class View3d {
   private hSize!: THREE.Mesh;
   private hHeight!: THREE.Mesh;
   private hRotate!: THREE.Mesh;
+  private hLift!: THREE.Mesh;
+  private liftLine!: THREE.Line;
+  private hitLift!: THREE.Mesh;
   private ring!: THREE.LineLoop;
   private hitSize!: THREE.Mesh;
   private hitHeight!: THREE.Mesh;
@@ -293,6 +299,13 @@ export class View3d {
     this.hSize = ball(COLORS.hSize);
     this.hHeight = ball(COLORS.hHeight);
     this.hRotate = ball(COLORS.hRotate);
+    this.hLift = ball(COLORS.hLift);
+    this.hitLift = hit();
+    // Linie vom Anheben-Griff zum Bett: zeigt, wie hoch der Körper schwebt
+    const lg = new THREE.BufferGeometry();
+    lg.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 1], 3));
+    this.liftLine = new THREE.Line(lg, new THREE.LineBasicMaterial({ color: COLORS.hLift, transparent: true, opacity: 0.7, depthTest: false }));
+    this.liftLine.renderOrder = 9;
     this.hitSize = hit();
     this.hitHeight = hit();
     this.hitRotate = hit();
@@ -303,7 +316,7 @@ export class View3d {
     rg.setAttribute('position', new THREE.Float32BufferAttribute(rp, 3));
     this.ring = new THREE.LineLoop(rg, new THREE.LineBasicMaterial({ color: COLORS.hRotate, transparent: true, opacity: 0.6, depthTest: false }));
     this.ring.renderOrder = 9;
-    this.handles.add(this.ring, this.hSize, this.hHeight, this.hRotate, this.hitSize, this.hitHeight, this.hitRotate);
+    this.handles.add(this.ring, this.liftLine, this.hSize, this.hHeight, this.hRotate, this.hLift, this.hitSize, this.hitHeight, this.hitRotate, this.hitLift);
     this.handles.visible = false;
   }
 
@@ -336,6 +349,13 @@ export class View3d {
     this.ring.position.set(p.x, p.y, p.z + 0.05);
     this.ring.scale.set(R, R, 1);
     put(this.hRotate, this.hitRotate, local(0, -R, p.z + 0.05));
+    // Anheben: Mitte der linken Seitenwand, auf halber Höhe; die Linie führt von dort zum Bett
+    const [lx, ly] = liftHandleXY(p);
+    put(this.hLift, this.hitLift, new THREE.Vector3(lx, ly, p.z + p.h / 2));
+    const pos = this.liftLine.geometry.getAttribute('position') as THREE.BufferAttribute;
+    pos.setXYZ(0, lx, ly, 0.05);
+    pos.setXYZ(1, lx, ly, p.z + p.h / 2);
+    pos.needsUpdate = true;
   }
 
   private invalidate(): void {
@@ -379,10 +399,10 @@ export class View3d {
 
   private pickHandle(): DragKind | null {
     if (!this.handles.visible) return null;
-    const hits = this.raycaster.intersectObjects([this.hitSize, this.hitHeight, this.hitRotate], false);
+    const hits = this.raycaster.intersectObjects([this.hitSize, this.hitHeight, this.hitRotate, this.hitLift], false);
     if (!hits.length) return null;
     const o = hits[0].object;
-    return o === this.hitSize ? 'size' : o === this.hitHeight ? 'height' : 'rotate';
+    return o === this.hitSize ? 'size' : o === this.hitHeight ? 'height' : o === this.hitLift ? 'lift' : 'rotate';
   }
 
   private pickPart(): string | null {
@@ -419,8 +439,15 @@ export class View3d {
   private beginDrag(kind: DragKind, p: Part, e: PointerEvent): void {
     const g = this.groundAt(e.clientX, e.clientY, p.z) ?? [p.x, p.y];
     const ray = this.setRay(e.clientX, e.clientY);
-    const gz = closestZOnVertical(ray.o, ray.d, p.x, p.y) ?? p.z + p.h;
-    this.drag = { kind, id: p.id, start: { ...p }, grab: g, grabZ: gz, offset: [p.x - g[0], p.y - g[1]] };
+    const [vx, vy] = kind === 'lift' ? liftHandleXY(p) : [p.x, p.y]; // senkrechte Linie, an der gezogen wird
+    const gz = closestZOnVertical(ray.o, ray.d, vx, vy) ?? p.z + p.h;
+    const start = { ...p };
+    const resting = kind === 'move' && Math.abs(p.z - supportHeight(start, this.others(p.id), start)) < 0.05;
+    this.drag = { kind, id: p.id, start, grab: g, grabZ: gz, resting, offset: [p.x - g[0], p.y - g[1]] };
+  }
+
+  private others(id: string): Part[] {
+    return this.parts.filter((q) => q.id !== id);
   }
 
   private endDrag(): void {
@@ -462,10 +489,20 @@ export class View3d {
       const ray = this.setRay(e.clientX, e.clientY);
       const z = closestZOnVertical(ray.o, ray.d, s.x, s.y);
       if (z !== null) next = resizeHeight(s, z - dr.grabZ, this.lock);
+    } else if (dr.kind === 'lift') {
+      const ray = this.setRay(e.clientX, e.clientY);
+      const [vx, vy] = liftHandleXY(s);
+      const z = closestZOnVertical(ray.o, ray.d, vx, vy);
+      if (z !== null) next = { ...s, z: liftZ(s.z, z - dr.grabZ, s.h, supportHeight(s, this.others(s.id), s), this.bed.height) };
     } else {
       const g = this.groundAt(e.clientX, e.clientY, s.z);
       if (!g) return;
-      if (dr.kind === 'move') next = { ...s, x: snap(g[0] + dr.offset[0]), y: snap(g[1] + dr.offset[1]) };
+      if (dr.kind === 'move') {
+        const others = this.others(s.id);
+        // auf ganze mm, Mitte auf Mitte einrasten, und falls er auflag: auf die neue Auflage fallen (z. B. Text auf einen Quader)
+        next = snapToCenters({ ...s, x: snap(g[0] + dr.offset[0]), y: snap(g[1] + dr.offset[1]) }, others);
+        if (dr.resting) next = { ...next, z: supportHeight(next, others, s) };
+      }
       else if (dr.kind === 'size') next = resizeFromGround(s, dr.grab, g, this.lock);
       else next = rotateFromGround(s, dr.grab, g);
     }
