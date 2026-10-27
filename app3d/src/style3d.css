@@ -881,3 +881,54 @@ input {
   .topbar .logo { height: min(40px, 70%); margin-right: 0; }
   .top-group { gap: 5px; }
 }
+
+/* ---------- Profil, Galerie, Lehrkraft (Regeln der Laser-App stehen in shared.css) ---------- */
+:root {
+  --accent: var(--m-blue);
+  --green: var(--m-green);
+  --red: var(--m-pink);
+  --blue-ink: #1b8fc2;
+}
+.btn.big {
+  width: 76px;
+}
+.logo-wrap {
+  position: relative;
+  display: inline-block;
+}
+.badge3d {
+  position: absolute;
+  right: -10px;
+  bottom: -6px;
+  width: 54px;
+  height: 54px;
+  border-radius: 16px;
+  background: var(--m-navy);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 3px 0 #2a4380;
+}
+.badge3d .icon {
+  width: 70%;
+  height: 70%;
+}
+.thumb-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.thumb-empty .icon {
+  width: 50%;
+  height: 50%;
+}
+.work-open .thumb {
+  object-fit: contain;
+}
+.chip.active {
+  background: var(--blue-tint);
+  box-shadow: 0 0 0 3px var(--m-blue) inset;
+  color: var(--m-navy);
+}

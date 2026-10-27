@@ -1,19 +1,26 @@
 // Editor der 3D-App: Körper-Leiste, 3D-Ansicht, Maße-Leiste, Rückgängig.
-import { button, confirmDialog, h, lab, overlay } from '../../src/dom';
+import { button, confirmDialog, h, lab } from '../../src/dom';
 import { ICONS } from '../../src/icons';
 import { formatNumber, openNumpad } from '../../src/numpad';
 import type { Shape } from '../../src/geometry';
-import type { PrinterSettings } from './bed';
-import { saveFile } from '../../src/exporter';
-import { openSaveDialog } from '../../src/saveDialog';
 import { combine } from './csg';
-import { openExportPanel, openKindPicker, openShapePicker, openSketch, openTextDialog, pickSvg, type ExportFormat } from './dialogs3d';
-import { bedCorner, buildFinal, printCheck, to3mf, toStl } from './printExport';
+import { notify, openKindPicker, openShapePicker, openSketch, openTextDialog, pickSvg } from './dialogs3d';
+import { createDesign, packDesign, unpackDesign } from './designIO';
+import { busyOverlay, exportParts } from './exportFlow';
 import { History } from './history';
 import { ICONS3D, KIND_ICONS } from './icons3d';
 import type { PartKind } from './mesh';
 import { MAX_SIZE, MIN_SIZE, applyDim, centered, cloneParts, createPart, duplicatePart, findFreeSpot, isOutside, makeOutlinePart, type DimField, type OutlineSize, type Part } from './model3d';
+import { storage, type Design, type ExportFormat, type Profile, type Settings } from './storage3d';
 import { View3d } from './view3d';
+
+export interface EditorOptions {
+  profile: Profile;
+  /** gespeicherte Arbeit oder null = neue Arbeit */
+  design: Design | null;
+  settings: Settings;
+  onExit: () => void;
+}
 
 const DIMS: { field: DimField; icon: string; unit: string; label: string }[] = [
   { field: 'w', icon: ICONS.arrowH, unit: 'mm', label: 'Breite' },
@@ -23,34 +30,35 @@ const DIMS: { field: DimField; icon: string; unit: string; label: string }[] = [
   { field: 'z', icon: ICONS3D.lift, unit: 'mm', label: 'Abstand zum Bett' },
 ];
 
-/** Kurzer Hinweis ohne Text: großes Symbol, verschwindet von selbst oder beim Antippen. */
-function notify(iconHtml: string): void {
-  const o = overlay('overlay-dim');
-  o.root.append(h('div', 'confirm-card', `<div class="confirm-icon">${iconHtml}</div>`));
-  const close = () => o.close();
-  o.root.addEventListener('click', close);
-  setTimeout(close, 1800);
-}
-
 export class Editor3d {
   readonly root = h('div', 'editor3d');
   private view: View3d;
   private parts: Part[] = [];
   private selectedId: string | null = null;
-  private history = new History<Part[]>([]);
+  private history: History<Part[]>;
+  private design: Design;
+  private printer: Settings;
+  private dirty = false;
+  private everSaved: boolean;
+  private saveTimer: number | undefined;
+  private saving: Promise<void> = Promise.resolve();
   private lock = true;
   private btn = {} as Record<'undo' | 'redo' | 'copy' | 'del' | 'hole' | 'merge' | 'export', HTMLButtonElement>;
-  private format: ExportFormat = 'stl';
+  private format: ExportFormat;
   private dimEls = new Map<DimField, HTMLElement>();
   private dims!: HTMLElement;
   private lockBtn!: HTMLButtonElement;
   private status!: HTMLElement;
 
-  constructor(private printer: PrinterSettings) {
+  constructor(private o: EditorOptions) {
+    this.printer = o.settings;
+    this.format = o.settings.format;
+    this.design = o.design ?? createDesign();
+    this.everSaved = !!o.design;
+    this.parts = unpackDesign(this.design);
+    this.history = new History<Part[]>(this.parts);
     const top = h('div', 'topbar');
-    const logo = h('img', 'logo') as HTMLImageElement;
-    logo.src = './mint2go-logo.png';
-    logo.alt = '';
+    const back = button('btn labeled', lab(ICONS.gallery, 'Galerie'), () => void this.exit(), 'Galerie');
     this.btn.undo = button('btn labeled', lab(ICONS.undo, 'Zurück'), () => this.undo(), 'Rückgängig');
     this.btn.redo = button('btn labeled', lab(ICONS.redo, 'Vor'), () => this.redo(), 'Wiederholen');
     this.btn.copy = button('btn labeled', lab(ICONS.copy, 'Kopie'), () => this.duplicate(), 'Kopieren');
@@ -66,7 +74,7 @@ export class Editor3d {
     groupCombine.append(this.btn.hole, this.btn.merge);
     const group2 = h('div', 'top-group');
     group2.append(this.status, home, this.btn.export);
-    top.append(logo, h('div', 'top-center'), groupCombine, group, group2);
+    top.append(back, h('div', 'top-center'), groupCombine, group, group2);
 
     const body = h('div', 'editor-body');
     const rail = h('div', 'rail left-rail');
@@ -86,16 +94,62 @@ export class Editor3d {
     body.append(rail, stage);
     this.root.append(top, body);
 
-    this.view = new View3d(host, printer.bed, {
+    this.view = new View3d(host, this.printer.bed, {
       select: (id) => this.select(id),
       update: (id, next) => this.replace(id, next),
       commit: () => this.commit(),
     });
     this.refresh();
+    // Beim Wechseln der App/Schließen sofort sichern
+    document.addEventListener('visibilitychange', this.onHide);
+    window.addEventListener('pagehide', this.onHide);
   }
 
   destroy(): void {
+    clearTimeout(this.saveTimer);
+    document.removeEventListener('visibilitychange', this.onHide);
+    window.removeEventListener('pagehide', this.onHide);
     this.view.destroy();
+  }
+
+  // ---------- Speichern (automatisch nach jeder Änderung) ----------
+  private onHide = (): void => {
+    if (document.visibilityState === 'hidden' || document.visibilityState === undefined) void this.saveNow();
+  };
+
+  private scheduleSave(): void {
+    this.dirty = true;
+    clearTimeout(this.saveTimer);
+    this.saveTimer = window.setTimeout(() => void this.saveNow(), 600);
+  }
+
+  /** Arbeit sichern (mit Vorschaubild). Mehrere Aufrufe laufen nacheinander. */
+  saveNow(): Promise<void> {
+    clearTimeout(this.saveTimer);
+    this.saving = this.saving.then(async () => {
+      if (!this.dirty) return;
+      if (this.parts.length === 0 && !this.everSaved) {
+        this.dirty = false;
+        return;
+      }
+      this.dirty = false;
+      try {
+        const thumb = this.view.snapshot() ?? undefined;
+        this.design = packDesign({ id: this.design.id, created: this.design.created, thumb }, this.parts);
+        await storage.saveDesign(this.o.profile.id, this.design);
+        this.everSaved = true;
+      } catch {
+        this.dirty = true;
+        this.saveTimer = window.setTimeout(() => void this.saveNow(), 5000); // später nochmal versuchen
+      }
+    });
+    return this.saving;
+  }
+
+  /** Zur Galerie: erst sichern. */
+  private async exit(): Promise<void> {
+    await this.saveNow();
+    this.o.onExit();
   }
 
   // ---------- Maße-Leiste ----------
@@ -147,6 +201,7 @@ export class Editor3d {
   private commit(): void {
     this.history.commit(this.parts);
     this.refresh();
+    this.scheduleSave();
   }
 
   private add(kind: PartKind): void {
@@ -170,8 +225,7 @@ export class Editor3d {
   private async merge(): Promise<void> {
     const p = this.selected();
     if (!p) return;
-    const busy = overlay('overlay-dim');
-    busy.root.append(h('div', 'confirm-card', `<div class="spinner">${ICONS.gear}</div>`));
+    const busy = busyOverlay();
     const r = await combine(p.id, this.parts).catch(() => ({ kind: 'error' as const }));
     busy.close();
     if (r.kind !== 'ok') return notify(ICONS.warn); // nichts berührt den Körper, oder ein Körper ist nicht in Ordnung
@@ -183,21 +237,8 @@ export class Editor3d {
   // ---------- Exportieren ----------
   /** Druckprüfung zeigen, Dateiart wählen, Dateiname vom Kind tippen lassen, speichern (STL/3MF). */
   private async exportModel(): Promise<void> {
-    const busy = overlay('overlay-dim');
-    busy.root.append(h('div', 'confirm-card', `<div class="spinner">${ICONS.gear}</div>`));
-    const model = await buildFinal(this.parts).catch(() => 'error' as const);
-    busy.close();
-    if (!model || model === 'error') return notify(ICONS.warn); // nichts zu drucken oder ein Körper ist nicht in Ordnung
-    const fmt = await openExportPanel(printCheck(this.parts, model, this.printer.bed, this.printer.nozzle), this.format);
-    if (!fmt) return;
-    this.format = fmt;
-    const shift = bedCorner(this.printer.bed);
-    openSaveDialog({
-      ext: fmt,
-      icon: ICONS.share,
-      // direkt im Tipp auf ✓: nur so darf das Teilen-Menü (iPad) geöffnet werden
-      onSave: (name) => void saveFile(name, fmt === 'stl' ? toStl(model, shift) : to3mf(model, shift), fmt === 'stl' ? 'model/stl' : 'model/3mf'),
-    });
+    const f = await exportParts(this.parts, this.printer, this.format);
+    if (f) this.format = f;
   }
 
   private async pickKind(): Promise<void> {
@@ -271,6 +312,7 @@ export class Editor3d {
     this.parts = cloneParts(parts);
     if (!this.selected()) this.selectedId = null;
     this.refresh();
+    this.scheduleSave();
   }
 
   private undo(): void {

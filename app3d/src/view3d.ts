@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { toCreasedNormals } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { Bed } from './bed';
 import { closestZOnVertical, rayPlaneZ, resizeFromGround, resizeHeight, rotateFromGround } from './gizmo';
-import { meshOf, snap, type Part } from './model3d';
+import { meshOf, partBounds, snap, type Part } from './model3d';
 import { FOV_DEG, cameraPosition, defaultOrbit, orbitPan, orbitRotate, orbitZoom, type Orbit, type Vec3 } from './orbit';
 
 const COLORS = {
@@ -54,6 +54,7 @@ export class View3d {
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(FOV_DEG, 1, 1, 5000);
   private bedGroup = new THREE.Group();
+  private frame: THREE.LineSegments | null = null;
   private partGroup = new THREE.Group();
   private meshes = new Map<string, THREE.Mesh>();
   private geometries = new Map<string, THREE.BufferGeometry>();
@@ -173,6 +174,61 @@ export class View3d {
     this.invalidate();
   }
 
+  /**
+   * Vorschaubild der ganzen Arbeit für die Galerie (JPEG als data-URL, 4:3), null wenn nichts da ist.
+   * Zeigt alle Körper ohne Auswahl und Griffe; die Ansicht bleibt danach unverändert.
+   */
+  snapshot(width = 320, height = 240): string | null {
+    if (!this.parts.length) return null;
+    const min = [Infinity, Infinity, Infinity];
+    const max = [-Infinity, -Infinity, -Infinity];
+    for (const p of this.parts) {
+      const b = partBounds(p);
+      for (let k = 0; k < 3; k++) {
+        min[k] = Math.min(min[k], b.min[k]);
+        max[k] = Math.max(max[k], b.max[k]);
+      }
+    }
+    const radius = Math.max(10, Math.hypot(max[0] - min[0], max[1] - min[1], max[2] - min[2]) / 2);
+    const saved = { orbit: this.orbit, handles: this.handles.visible, frame: this.frame?.visible ?? true, mats: new Map<THREE.Mesh, THREE.Material | THREE.Material[]>() };
+    const plain = new Map<THREE.Material, THREE.Material>([[this.mats.selected, this.mats.part], [this.mats.holeSelected, this.mats.hole]]);
+    for (const m of this.meshes.values()) {
+      saved.mats.set(m, m.material);
+      const swap = plain.get(m.material as THREE.Material);
+      if (swap) m.material = swap;
+    }
+    try {
+      const home = defaultOrbit(this.bed);
+      const aspect = this.canvas.width / Math.max(1, this.canvas.height);
+      const dist = (radius / Math.sin(((FOV_DEG / 2) * Math.PI) / 180)) * 1.15 * Math.max(1, (4 / 3) / aspect);
+      const orbit: Orbit = { ...home, dist, target: [(min[0] + max[0]) / 2, (min[1] + max[1]) / 2, (min[2] + max[2]) / 2] };
+      const [px, py, pz] = cameraPosition(orbit);
+      this.camera.position.set(px, py, pz);
+      this.camera.lookAt(orbit.target[0], orbit.target[1], orbit.target[2]);
+      this.camera.updateMatrixWorld();
+      this.handles.visible = false;
+      if (this.frame) this.frame.visible = false;
+      this.renderer.render(this.scene, this.camera);
+      // 4:3 aus der Mitte ausschneiden und verkleinern (toDataURL gleich nach dem Zeichnen, sonst ist der Puffer leer)
+      const src = this.canvas;
+      const sw = Math.min(src.width, (src.height * width) / height);
+      const sh = (sw * height) / width;
+      const c = document.createElement('canvas');
+      c.width = width;
+      c.height = height;
+      c.getContext('2d')!.drawImage(src, (src.width - sw) / 2, (src.height - sh) / 2, sw, sh, 0, 0, width, height);
+      return c.toDataURL('image/jpeg', 0.75);
+    } catch {
+      return null;
+    } finally {
+      for (const [m, mat] of saved.mats) m.material = mat;
+      this.handles.visible = saved.handles;
+      if (this.frame) this.frame.visible = saved.frame;
+      this.orbit = saved.orbit;
+      this.invalidate();
+    }
+  }
+
   destroy(): void {
     cancelAnimationFrame(this.raf);
     this.ro.disconnect();
@@ -221,6 +277,7 @@ export class View3d {
     const frame = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: COLORS.volume, transparent: true, opacity: 0.45 }));
     frame.position.z = h / 2;
     this.bedGroup.add(frame);
+    this.frame = frame;
   }
 
   private buildHandles(): void {

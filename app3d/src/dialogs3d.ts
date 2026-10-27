@@ -11,6 +11,7 @@ import { GLYPH_HEIGHT, textShape } from '../../src/text';
 import { grayFromRGBA, traceGray } from '../../src/trace';
 import { ICONS3D, KIND_ICONS } from './icons3d';
 import type { PrintCheck } from './printExport';
+import type { ExportFormat } from './storage3d';
 import { KIND_LABELS, PART_KINDS, type PartKind } from './mesh';
 
 // ---------- Körper ----------
@@ -348,7 +349,7 @@ export function pickSvg(onShape: (shape: Shape) => void, onBad: () => void): voi
 }
 
 // ---------- Export: Druckprüfung und Dateiart ----------
-export type ExportFormat = 'stl' | '3mf';
+export type { ExportFormat };
 
 /**
  * Druckprüfung ohne Text: je Prüfung ein Symbol mit grünem Haken (in Ordnung) oder orangem Warnzeichen,
@@ -389,4 +390,13 @@ export function openExportPanel(check: PrintCheck, initial: ExportFormat): Promi
     panel.append(head, cards, fmts);
     o.root.append(panel);
   });
+}
+
+/** Kurzer Hinweis ohne Text: großes Symbol, verschwindet von selbst oder beim Antippen. */
+export function notify(iconHtml: string): void {
+  const o = overlay('overlay-dim');
+  o.root.append(h('div', 'confirm-card', `<div class="confirm-icon">${iconHtml}</div>`));
+  const close = () => o.close();
+  o.root.addEventListener('click', close);
+  setTimeout(close, 1800);
 }
