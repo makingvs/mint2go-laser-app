@@ -107,7 +107,18 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 - Vorlagen (SVG in mm: rot = Schneiden, blau = Gravieren) über `svgToTemplate`; neue Taste Mitte
 - Farben/Typen bleiben fest (Schneiden rot, Gravieren blau, Füllen schwarz)
 
+## 3D-Druck-App (app3d/, eigene App im selben Repo)
+- Ziel: wie die Laser-App, aber für den 3D-Drucker. Kinder zeichnen (Formen/Freihand/Text/SVG) und geben Höhe (Extrusion) UND kombinieren 3D-Grundkörper (vereinen/ausschneiden). Export STL + 3MF (Dateiname vom Kind getippt, wie bei der Laser-App)
+- three.js (MIT) ist die einzige Laufzeit-Bibliothek der 3D-App (vom Nutzer freigegeben, nur für die Ansicht); Geometrie/Mesh/STL/3MF selbst schreiben. Für Vereinen/Ausschneiden (CSG) VOR Phase 4 nochmal fragen (Bibliothek oder selbst)
+- Aufbau: app3d/index.html + app3d/src/ (Quellen), app3d/public/ (Manifest, Icons, config.json mit Bett/Düse); Build `vite.3d.config.ts` -> dist/3d/ mit eigenem Service Worker (`node scripts/make-sw.mjs 3d`, eigener Cache-Name)
+- Befehle: `npm run dev:3d` (Port 5174), `npm run build` baut beide Apps; Tests liegen in tests/ (importieren aus ../app3d/src)
+- Koordinaten: Ursprung Mitte Druckbett, x rechts, y hinten, z oben (z = 0 ist das Bett), Maße in mm
+- Reine Logik ohne three.js (testbar): app3d/src/bed.ts (Bauraum), app3d/src/orbit.ts (Kamera); Ansicht: app3d/src/view3d.ts
+- Phasen 3D: 1 Gerüst + Ansicht · 2 Körper platzieren/skalieren/drehen · 3 Zeichnen + Höhe · 4 Kombinieren (CSG) · 5 Export STL/3MF + Druckprüfung · 6 Profile/Galerie/Speichern/Lehrkraft · 7 Feinschliff/Klassentest
+- Offen: Druckermodell (Standard 220 x 220 x 250 mm, Düse 0,4 mm in app3d/public/config.json), eigenes App-Symbol für 3D (aktuell Kopie der Laser-App)
+
 ## Stand
+27.10.2026 (3D Phase 1): Gerüst der 3D-App (app3d/): eigener Build nach dist/3d/ mit eigenem Service Worker, 3D-Ansicht mit three.js (Druckbett mit Raster, Bauraum-Rahmen, Testwürfel), Kamera per Touch (1 Finger drehen, 2 Finger zoomen/verschieben, Maus: Ziehen/Rad/Umschalt), Haus-Taste = Ansicht zurücksetzen. 118 Tests grün (9 neu: bed, orbit), Build ok, im Browser geprüft (Drehen, Zoomen). Nicht auf iPad getestet.
 27.10.2026: Geführter Modus (Laser-Werkstatt, 20 Projekte) mit Coach-Leiste, automatischer Prüfung, Vorlagen und Fortschritt; Taste Mitte. 109 Tests grün, im Browser durchgespielt (Türschild komplett, Zahnräder/Schatzkiste/Laterne/Labyrinth-Vorlagen, Zeichenfläche-Schritt, Fortschritt). Nicht auf iPad getestet.
 27.10.2026: Deutsche Tastatur (QWERTZ), Dateiname ohne Vorschlag, freies Ziehen an Ecken ohne Seitenverhältnis-Sperre, Info-Symbol aus der Kartenliste, ultra-kompaktes Layout (< 540 px). 98 Tests grün.
 26.10.2026 (Layout/Dateiname/Schrift ändern): Layout-Prüfung auf 7 Fenstergrößen (ohne Befund nach Anpassung: höhenabhängige Größen, Formen-Auswahl im Fenster, Zahlentastatur/Dialoge scrollbar, Galerie-Tasten unter dem Bild), Dateiname vor jedem Export, Text/Schrift nachträglich änderbar. 94 Tests grün.
