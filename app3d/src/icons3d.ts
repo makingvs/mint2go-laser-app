@@ -20,5 +20,7 @@ export const KIND_ICONS: Record<PartKind, string> = {
 export const ICONS3D = {
   depth: svg('<path d="M5 19 19 5M5 19v-5M5 19h5M19 5v5M19 5h-5"/>'),
   lift: svg('<path d="M12 4v11M8 8l4-4 4 4"/><path d="M4 20h16"/>'),
+  hole: svg('<rect x="4" y="4" width="16" height="16" rx="3" stroke-dasharray="3.500 3"/><circle cx="12" cy="12" r="3.500"/>'),
+  merge: svg('<circle cx="9" cy="12" r="6" fill="currentColor" fill-opacity=".14"/><circle cx="15" cy="12" r="6" fill="currentColor" fill-opacity=".14"/>'),
   home: svg('<path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>'),
 };

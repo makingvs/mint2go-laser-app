@@ -725,3 +725,9 @@ button {
   width: calc(var(--ico) + 10px);
   height: calc(var(--ico) + 10px);
 }
+
+/* ---------- Loch-Taste (an) ---------- */
+.btn.labeled.active {
+  background: #fdf1de;
+  box-shadow: 0 0 0 3px var(--m-orange) inset;
+}

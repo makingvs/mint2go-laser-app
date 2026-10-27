@@ -3,6 +3,7 @@ import type { Shape } from '../../src/geometry';
 import { fitsInBuildVolume, type Bed, type Box3 } from './bed';
 import { normalizeOutline, outlineMesh } from './extrude';
 import { KIND_SIZE, unitMesh, type PartKind, type TriMesh } from './mesh';
+import { getMesh } from './meshStore';
 
 /** Umriss eines gezeichneten Körpers (normiert, siehe extrude.ts); die Nummer dient dem Zwischenspeicher. */
 export interface Outline {
@@ -12,9 +13,13 @@ export interface Outline {
 
 export interface Part {
   id: string;
-  /** Grundkörper oder 'extrude' = gezeichneter Umriss mit Höhe */
-  kind: PartKind | 'extrude';
+  /** Grundkörper, 'extrude' = gezeichneter Umriss mit Höhe, 'mesh' = Ergebnis von "Vereinen" */
+  kind: PartKind | 'extrude' | 'mesh';
   outline?: Outline;
+  /** Nummer des Netzes in meshStore.ts (nur bei kind 'mesh') */
+  meshId?: string;
+  /** Loch: wird nicht gedruckt, sondern schneidet beim Vereinen aus den anderen Körpern aus */
+  hole?: boolean;
   x: number; // Mitte, mm
   y: number;
   z: number; // Abstand des Bodens zum Bett (0 = liegt auf dem Bett)
@@ -78,7 +83,9 @@ export function makeOutlinePart(source: Shape, size: OutlineSize, height: number
 
 /** Netz im Einheitsquader zu diesem Körper. */
 export function meshOf(p: Part): TriMesh {
-  return p.kind === 'extrude' && p.outline ? outlineMesh(p.outline.id, p.outline.rings) : unitMesh(p.kind === 'extrude' ? 'box' : p.kind);
+  if (p.kind === 'extrude' && p.outline) return outlineMesh(p.outline.id, p.outline.rings);
+  if (p.kind === 'mesh' && p.meshId) return getMesh(p.meshId) ?? unitMesh('box');
+  return unitMesh(p.kind === 'extrude' || p.kind === 'mesh' ? 'box' : p.kind);
 }
 
 /** Eckpunkte des Körpers im Raum (Netz skaliert, gedreht, verschoben). */

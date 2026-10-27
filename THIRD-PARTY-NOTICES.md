@@ -61,3 +61,6 @@ Vite, TypeScript, Vitest, @types/node (MIT bzw. Apache 2.0). Der QR-Code `docs/i
 Die 3D-Ansicht nutzt [three.js](https://threejs.org) (MIT, © 2010-2024 three.js authors, Lizenztext:
 `app3d/public/licenses/three.txt`, wird mit der 3D-App ausgeliefert). Die Schriften der Text-Funktion (Jost, Fredoka, Baloo 2, Rubik Mono One, Bangers, Caveat, Pacifico; alle OFL 1.1, Angaben
 wie in der Tabelle oben) liegen mit ihren Lizenztexten bei (`app3d/public/licenses/font-*.txt`). Geometrie, Mesh-Erzeugung und Export sind selbst geschrieben.
+
+Zum Vereinen und Ausschneiden von Körpern (Phase 4) nutzt die 3D-App [manifold-3d](https://github.com/elalish/manifold)
+(Apache License 2.0, © The Manifold Authors, als WebAssembly; Lizenztext: `app3d/public/licenses/manifold.txt`).

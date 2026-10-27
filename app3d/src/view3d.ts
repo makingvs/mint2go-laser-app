@@ -17,6 +17,7 @@ const COLORS = {
   part: 0x98c227,
   selected: 0x38b8e8,
   outside: 0xe01070,
+  hole: 0xf0a030,
   hSize: 0xf0a030,
   hHeight: 0x38b8e8,
   hRotate: 0xe01070,
@@ -26,7 +27,7 @@ const HANDLE_PX = 15; // sichtbarer Radius der Griffe in Pixeln
 const HIT_PX = 34; // Trefferradius (Finger sind dick)
 
 /** Gleiche Schlüssel = gleiche Form (Grundkörper nach Art, gezeichnete Körper nach Umriss-Nummer). */
-const geometryKey = (p: Part): string => (p.kind === 'extrude' ? `x:${p.outline?.id}` : p.kind);
+const geometryKey = (p: Part): string => (p.kind === 'extrude' ? `x:${p.outline?.id}` : p.kind === 'mesh' ? `m:${p.meshId}` : p.kind);
 
 type DragKind = 'move' | 'size' | 'height' | 'rotate';
 
@@ -60,6 +61,9 @@ export class View3d {
     part: new THREE.MeshStandardMaterial({ color: COLORS.part, roughness: 0.55 }),
     selected: new THREE.MeshStandardMaterial({ color: COLORS.selected, roughness: 0.55 }),
     outside: new THREE.MeshStandardMaterial({ color: COLORS.outside, roughness: 0.55, transparent: true, opacity: 0.85 }),
+    // Löcher: durchscheinend, damit man sieht, was sie später ausschneiden
+    hole: new THREE.MeshStandardMaterial({ color: COLORS.hole, roughness: 0.6, transparent: true, opacity: 0.45, depthWrite: false }),
+    holeSelected: new THREE.MeshStandardMaterial({ color: COLORS.selected, roughness: 0.6, transparent: true, opacity: 0.55, depthWrite: false }),
   };
   private handles = new THREE.Group();
   private hSize!: THREE.Mesh;
@@ -155,7 +159,16 @@ export class View3d {
       m.position.set(p.x, p.y, p.z);
       m.rotation.z = (p.rot * Math.PI) / 180;
       m.scale.set(p.w, p.d, p.h);
-      m.material = outside.has(p.id) ? this.mats.outside : p.id === selectedId ? this.mats.selected : this.mats.part;
+      m.material = p.hole
+        ? p.id === selectedId
+          ? this.mats.holeSelected
+          : this.mats.hole
+        : outside.has(p.id)
+          ? this.mats.outside
+          : p.id === selectedId
+            ? this.mats.selected
+            : this.mats.part;
+      m.renderOrder = p.hole ? 2 : 0; // Löcher zuletzt, damit sie über den Körpern liegen
     }
     this.invalidate();
   }

@@ -4,6 +4,7 @@ import { ICONS } from '../../src/icons';
 import { formatNumber, openNumpad } from '../../src/numpad';
 import type { Shape } from '../../src/geometry';
 import type { PrinterSettings } from './bed';
+import { combine } from './csg';
 import { openKindPicker, openShapePicker, openSketch, openTextDialog, pickSvg } from './dialogs3d';
 import { History } from './history';
 import { ICONS3D, KIND_ICONS } from './icons3d';
@@ -35,7 +36,7 @@ export class Editor3d {
   private selectedId: string | null = null;
   private history = new History<Part[]>([]);
   private lock = true;
-  private btn = {} as Record<'undo' | 'redo' | 'copy' | 'del', HTMLButtonElement>;
+  private btn = {} as Record<'undo' | 'redo' | 'copy' | 'del' | 'hole' | 'merge', HTMLButtonElement>;
   private dimEls = new Map<DimField, HTMLElement>();
   private dims!: HTMLElement;
   private lockBtn!: HTMLButtonElement;
@@ -50,13 +51,17 @@ export class Editor3d {
     this.btn.redo = button('btn labeled', lab(ICONS.redo, 'Vor'), () => this.redo(), 'Wiederholen');
     this.btn.copy = button('btn labeled', lab(ICONS.copy, 'Kopie'), () => this.duplicate(), 'Kopieren');
     this.btn.del = button('btn labeled danger', lab(ICONS.trash, 'Löschen'), () => void this.remove(), 'Löschen');
+    this.btn.hole = button('btn labeled', lab(ICONS3D.hole, 'Loch'), () => this.toggleHole(), 'Loch');
+    this.btn.merge = button('btn labeled', lab(ICONS3D.merge, 'Vereinen'), () => void this.merge(), 'Vereinen');
     this.status = h('div', 'status', ICONS.warn);
     const home = button('btn labeled', lab(ICONS3D.home, 'Ansicht'), () => this.view.resetView(), 'Ansicht zurücksetzen');
     const group = h('div', 'top-group');
     group.append(this.btn.undo, this.btn.redo, this.btn.copy, this.btn.del);
+    const groupCombine = h('div', 'top-group');
+    groupCombine.append(this.btn.hole, this.btn.merge);
     const group2 = h('div', 'top-group');
     group2.append(this.status, home);
-    top.append(logo, h('div', 'top-center'), group, group2);
+    top.append(logo, h('div', 'top-center'), groupCombine, group, group2);
 
     const body = h('div', 'editor-body');
     const rail = h('div', 'rail left-rail');
@@ -147,6 +152,29 @@ export class Editor3d {
     this.commit();
   }
 
+  // ---------- Kombinieren ----------
+  /** Voll <-> Loch: ein Loch wird nicht gedruckt, sondern schneidet beim Vereinen aus. */
+  private toggleHole(): void {
+    const p = this.selected();
+    if (!p) return;
+    this.replace(p.id, { ...p, hole: !p.hole });
+    this.commit();
+  }
+
+  /** Den gewählten Körper mit allen, die ihn berühren, zu einem Teil vereinen (Löcher schneiden aus). */
+  private async merge(): Promise<void> {
+    const p = this.selected();
+    if (!p) return;
+    const busy = overlay('overlay-dim');
+    busy.root.append(h('div', 'confirm-card', `<div class="spinner">${ICONS.gear}</div>`));
+    const r = await combine(p.id, this.parts).catch(() => ({ kind: 'error' as const }));
+    busy.close();
+    if (r.kind !== 'ok') return notify(ICONS.warn); // nichts berührt den Körper, oder ein Körper ist nicht in Ordnung
+    this.parts = [...this.parts.filter((q) => !r.ids.includes(q.id)), ...(r.part ? [r.part] : [])];
+    this.selectedId = r.part?.id ?? null;
+    this.commit();
+  }
+
   private async pickKind(): Promise<void> {
     const kind = await openKindPicker();
     if (kind) this.add(kind);
@@ -229,7 +257,7 @@ export class Editor3d {
   }
 
   private refresh(): void {
-    const outside = new Set(this.parts.filter((p) => isOutside(p, this.printer.bed)).map((p) => p.id));
+    const outside = new Set(this.parts.filter((p) => !p.hole && isOutside(p, this.printer.bed)).map((p) => p.id)); // Löcher werden nicht gedruckt
     this.view.setParts(this.parts, this.selectedId, outside);
     const sel = this.selected();
     this.dims.classList.toggle('off', !sel);
@@ -240,6 +268,9 @@ export class Editor3d {
     this.btn.redo.disabled = !this.history.canRedo;
     this.btn.copy.disabled = !sel;
     this.btn.del.disabled = !sel;
+    this.btn.hole.disabled = !sel;
+    this.btn.hole.classList.toggle('active', !!sel?.hole);
+    this.btn.merge.disabled = !sel;
     this.status.classList.toggle('bad', outside.size > 0);
   }
 }
