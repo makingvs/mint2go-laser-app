@@ -36,6 +36,7 @@ export const ICONS = {
   picture: svg('<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="2"/><path d="m3 18 6-5 4 4 3-3 5 5"/>'),
   text: svg('<path d="M5 20 12 4l7 16M8 14h8"/>'),
   draw: svg('<circle cx="5" cy="18" r="1.600" fill="currentColor" stroke="none"/><path d="M5 18c5.500-.5 3.500-10 8.500-10s3.500 7 7.500 6"/>'),
+  center: svg('<circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>'),
   check: svg('<path d="m4 12 6 6L20 6"/>'),
   cross: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
   plus: svg('<path d="M12 4v16M4 12h16"/>'),

@@ -1,6 +1,10 @@
 import './style.css';
+import './guided/guided.css';
 import { Editor } from './editor';
 import { DEFAULT_SETTINGS, createDesign, type Design, type Settings, type Surface } from './model';
+import type { GuideState, Project } from './guided/engine';
+import { werkstattScreen } from './guided/werkstatt';
+import { defaultSurface, ellipseSurface, rectSurface } from './surface';
 import { openSurfaceDialog } from './surfaceDialog';
 import { galleryScreen, profileScreen } from './screens';
 import { storage, type Profile } from './storage';
@@ -16,7 +20,7 @@ for (const ev of ['gesturestart', 'gesturechange', 'gestureend', 'contextmenu', 
 document.addEventListener(
   'touchmove',
   (e) => {
-    if (!(e.target as HTMLElement).closest('.pick-grid, .tform, .card-grid, .keys, .kb, .left-rail, .font-row')) e.preventDefault();
+    if (!(e.target as HTMLElement).closest('.pick-grid, .tform, .card-grid, .keys, .kb, .left-rail, .font-row, .werk-list, .guide-panel')) e.preventDefault();
   },
   { passive: false },
 );
@@ -40,18 +44,38 @@ async function showGallery(profile: Profile): Promise<void> {
     if (d) openEditor(profile, d);
     // Neue Arbeit: zuerst die Zeichenfläche wählen (unendlich oder Werkstück mit Maßen)
     else openSurfaceDialog({ settings, onDone: (surface) => openEditor(profile, null, surface) });
+  }, () => void showWerkstatt(profile));
+}
+
+/** Laser-Werkstatt: geführte Projekte */
+async function showWerkstatt(profile: Profile): Promise<void> {
+  if (updatePending) return location.reload();
+  editor?.destroy();
+  editor = null;
+  settings = await storage.getSettings();
+  const designs = await storage.listDesigns(profile.id).catch(() => [] as Design[]);
+  werkstattScreen(app, designs, {
+    onBack: () => void showGallery(profile),
+    onStart: (p, d) => startGuided(profile, p, d),
   });
 }
 
-function openEditor(profile: Profile, existing: Design | null, surface?: Surface): void {
+function startGuided(profile: Profile, p: Project, existing: Design | null): void {
+  if (existing) return openEditor(profile, existing);
+  const s = p.surface;
+  const surface = !s ? defaultSurface(settings) : s.kind === 'ellipse' ? ellipseSurface(s.w, s.h) : rectSurface(s.w, s.h);
+  openEditor(profile, null, surface, { project: p.n, step: 0 });
+}
+
+function openEditor(profile: Profile, existing: Design | null, surface?: Surface, guide?: GuideState): void {
   app.innerHTML = '';
-  const design = existing ?? { ...createDesign(), surface };
+  const design = existing ?? { ...createDesign(), surface, guide };
   editor = new Editor({
     profile,
     design,
     settings,
     saved: !!existing,
-    onExit: () => void showGallery(profile),
+    onExit: () => void (design.guide ? showWerkstatt(profile) : showGallery(profile)),
   });
   app.append(editor.root);
 }

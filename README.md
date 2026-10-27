@@ -176,6 +176,20 @@ Beim Anlegen eines neuen Benutzers sind **Tier-Symbole, die schon vergeben sind,
 
 Rechts unter den Werkzeugen: **＋** vergrößert, **－** verkleinert (stufenweise ×1,5, bis 800 %), die Taste mit dem Rahmen zeigt wieder die **ganze Arbeitsfläche**. Die Prozentzahl steht darunter. Die Maße in mm ändern sich dabei nicht – nur der Ausschnitt. Im vergrößerten Zustand lässt sich der Ausschnitt verschieben, indem man auf eine **leere Stelle** der Fläche tippt und zieht. Ein ausgewähltes Teil wird beim Vergrößern in die Mitte genommen. Zwei Finger auf der Fläche zoomen nicht, sondern skalieren/drehen wie bisher das ausgewählte Teil.
 
+## Geführter Modus: Laser-Werkstatt
+
+In der Galerie führt die orange Karte **Laser-Werkstatt** zu den **20 Projekten** der MINT2Go Laser-Werkstatt (4 Stufen: Starter, Gravur-Profi, Schneide-Meister, Erfinder). Die Zeichnungen entstehen **direkt in dieser App** (nicht im xTool Studio). Ein Projekt wählen → „Los geht’s“ → im Editor erscheint oben über der Fläche die **Coach-Leiste**:
+
+- Sie zeigt den aktuellen Schritt (Symbol, kurze Anweisung) und **hebt die passende Taste** hervor (pulsierender Rahmen).
+- Das **Ergebnis wird automatisch geprüft** (z. B. „Breite 120, Höhe 60“, Name liegt auf dem Schild, Loch im Tier, Typ Schneiden/Gravieren/Füllen, Teile innerhalb der Fläche, keine zu dünnen Stellen). Passt es, springt der Coach nach einem Moment zum nächsten Schritt. Gelb/grau erscheinen Hinweise wie „Jetzt: Breite 12 mm. Gesucht: 120 mm“.
+- Pfeil-Tasten gehen vor/zurück (jeder Schritt lässt sich auch ohne Treffer überspringen), **ⓘ** zeigt Warnung, Tipp und Profi-Wissen, der Pfeil ganz rechts klappt die Leiste klein.
+- Schritte ohne Zeichnen (Farbe auftragen, Kleben, Lasern, Waschen) werden von Hand mit dem grünen Pfeil bestätigt; der Schritt „Abschicken“ ist erledigt, sobald die SVG exportiert wurde (Dateiname bestimmt das Kind selbst).
+- Zu den Projekten 14, 17, 19 und 20 gibt es **Vorlagen** (Zahnräder, Schatzkiste, Laterne, Labyrinth): Die Taste „Vorlage laden“ setzt die Zeichenfläche auf die Vorlagengröße und fügt die Teile ein (rote Linien = Schneiden, blaue = Gravieren). Dateien: `public/werkstatt/vorlagen/*.svg`, Bilder der Projekte: `public/werkstatt/pics/*.jpg`.
+- Zeichenfläche statt „Hilfsform“ (Projekte 4, 6, 10, 16), Suche statt „Tier-Formen“, **Bild-Taste** statt Foto in xTool (Umkehren für Schiefer), neue Taste **Mitte** unter der Fläche (zentriert das Teil im nächstgrößeren Teil bzw. in der Fläche).
+- Der Fortschritt wird je Arbeit gespeichert (Plakette 🛠️/✓ in der Galerie, Balken in der Werkstatt). Am Ende: Fertig-Fenster mit Ideen und den **Laser-Werten für die Lehrperson** (Material, Leistung, Tempo); die 5 Laser-Regeln stehen unter 🛡️.
+
+Projektdaten und Schritte: `src/guided/projects.ts`, Prüfungen: `src/guided/engine.ts`, Oberfläche: `coach.ts`, `werkstatt.ts`, `dialogs.ts`, `guided.css`.
+
 ## Lokaler Server (optional)
 
 Im Ordner `server/` liegt ein kleiner Node.js-Server (ohne Abhängigkeiten): `start.bat` liefert `dist/` im Schulnetz aus, `wlan-einrichten.bat` öffnet einmalig (als Administrator) den Port 3000 in der Windows-Firewall für das lokale Netz, `autostart-installieren.bat` startet ihn mit Windows. Für die App selbst ist er **nicht nötig**; er bietet außerdem die Schnittstellen für das spätere „Senden“ (`POST /api/send` → Ordner `Laser-Eingang`).

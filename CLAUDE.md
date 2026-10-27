@@ -101,7 +101,14 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 - src/screens.ts: Profile + Galerie; src/teacher.ts: Lehrkraft-Bereich
 - server/server.mjs: optionaler Server (nicht von der App benutzt); tests/: Vitest
 
+## Geführter Modus (Laser-Werkstatt)
+- 20 Projekte aus der MINT2Go Laser-Werkstatt, gezeichnet in der App statt im xTool Studio; Daten `src/guided/projects.ts`, reine Prüflogik `src/guided/engine.ts` (Snapshot-Prüfungen, testbar)
+- Coach-Leiste im Editor (`coach.ts`), Auswahl-Bildschirm (`werkstatt.ts`), Fenster (`dialogs.ts`); Fortschritt in `Design.guide`
+- Vorlagen (SVG in mm: rot = Schneiden, blau = Gravieren) über `svgToTemplate`; neue Taste Mitte
+- Farben/Typen bleiben fest (Schneiden rot, Gravieren blau, Füllen schwarz)
+
 ## Stand
+27.10.2026: Geführter Modus (Laser-Werkstatt, 20 Projekte) mit Coach-Leiste, automatischer Prüfung, Vorlagen und Fortschritt; Taste Mitte. 109 Tests grün, im Browser durchgespielt (Türschild komplett, Zahnräder/Schatzkiste/Laterne/Labyrinth-Vorlagen, Zeichenfläche-Schritt, Fortschritt). Nicht auf iPad getestet.
 27.10.2026: Deutsche Tastatur (QWERTZ), Dateiname ohne Vorschlag, freies Ziehen an Ecken ohne Seitenverhältnis-Sperre, Info-Symbol aus der Kartenliste, ultra-kompaktes Layout (< 540 px). 98 Tests grün.
 26.10.2026 (Layout/Dateiname/Schrift ändern): Layout-Prüfung auf 7 Fenstergrößen (ohne Befund nach Anpassung: höhenabhängige Größen, Formen-Auswahl im Fenster, Zahlentastatur/Dialoge scrollbar, Galerie-Tasten unter dem Bild), Dateiname vor jedem Export, Text/Schrift nachträglich änderbar. 94 Tests grün.
 26.10.2026 (Icons/Beschriftung/Formen): Symbole vereinheitlicht (Formen-Symbole mit gleicher optischer Größe, neue Symbole für Fläche/Formen/Freihand), Schrift unter allen Werkzeugtasten, 29 vorgefertigte Formen in 3 Gruppen. 92 Tests grün.

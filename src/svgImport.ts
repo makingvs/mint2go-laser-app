@@ -117,7 +117,18 @@ const bez = (n: number, f: (t: number) => Pt): Pt[] => Array.from({ length: n },
 
 /** Pfaddaten in Teilpfade (Punktlisten) umwandeln; Kurven werden fein in Strecken zerlegt. */
 export function parsePath(d: string): Ring[] {
-  const subs: Ring[] = [];
+  return parsePathEx(d).map((p) => p.pts);
+}
+
+export interface SubPath {
+  pts: Ring;
+  /** mit "Z" geschlossen */
+  closed: boolean;
+}
+
+/** Wie parsePath, merkt sich aber, ob ein Teilpfad geschlossen ist (für offene Linien). */
+export function parsePathEx(d: string): SubPath[] {
+  const subs: SubPath[] = [];
   let cur: Ring = [];
   let x = 0;
   let y = 0;
@@ -143,8 +154,8 @@ export function parsePath(d: string): Ring[] {
     if (d[i] === '0' || d[i] === '1') return Number(d[i++]);
     return null;
   };
-  const flush = () => {
-    if (cur.length) subs.push(cur);
+  const flush = (closed = false) => {
+    if (cur.length) subs.push({ pts: cur, closed });
     cur = [];
   };
   let cmd = '';
@@ -159,7 +170,7 @@ export function parsePath(d: string): Ring[] {
       if (cur.length) {
         x = sx;
         y = sy;
-        flush();
+        flush(true);
       }
       lastCtrl = null;
       lastCmd = 'z';
@@ -398,4 +409,75 @@ export function svgToShape(text: string): Shape {
   } catch {
     return [];
   }
+}
+
+// ---------- Vorlagen (SVG in mm mit roten/blauen Linien) ----------
+export interface TemplatePart {
+  rings: Ring[];
+  /** offene Linien (z. B. Falzlinien) */
+  open: boolean;
+  op: 'cut' | 'engrave' | 'fill';
+}
+
+export interface Template {
+  /** Größe der Vorlage in mm */
+  w: number;
+  h: number;
+  parts: TemplatePart[];
+}
+
+const colorOp = (c: string | undefined): TemplatePart['op'] | null => {
+  const v = (c ?? '').toLowerCase().replace(/s/g, '');
+  if (v === '#ff0000' || v === 'red' || v === 'rgb(255,0,0)') return 'cut';
+  if (v === '#0000ff' || v === 'blue' || v === 'rgb(0,0,255)') return 'engrave';
+  if (v === '#000000' || v === '#000' || v === 'black') return 'fill';
+  return null;
+};
+
+/**
+ * Vorlage lesen: Maße bleiben in mm (viewBox = mm). Rote Linien = Schneiden, blaue = Gravieren,
+ * schwarze Füllung = Flächengravur. Je Pfad/Form entsteht ein Teil; Beschriftungen (<text>) entfallen.
+ */
+export function nodeToTemplate(root: SvgNode): Template {
+  const num2 = (v: string | undefined) => (v ? parseFloat(v) : NaN);
+  const w = num2(root.attrs.width) || 100;
+  const h = num2(root.attrs.height) || 100;
+  const parts: TemplatePart[] = [];
+  const walk = (node: SvgNode, m: Matrix, depth: number): void => {
+    if (depth > 20) return;
+    for (const child of node.children) {
+      if (SKIP.has(child.tag)) continue;
+      const cm = mul(m, parseTransform(child.attrs.transform));
+      if (CONTAINERS.has(child.tag)) {
+        walk(child, cm, depth + 1);
+        continue;
+      }
+      const fillOp = child.attrs.fill && child.attrs.fill !== 'none' ? colorOp(child.attrs.fill) : null;
+      const strokeOp = colorOp(child.attrs.stroke);
+      const op = strokeOp ?? fillOp;
+      if (!op) continue;
+      let rings: Ring[];
+      let open = false;
+      if (child.tag === 'path') {
+        const subs = parsePathEx(child.attrs.d ?? '').filter((p) => p.pts.length >= 2);
+        rings = subs.map((p) => p.pts.map((pt) => apply(cm, pt)));
+        open = subs.some((p) => !p.closed);
+      } else {
+        rings = shapeToRings(child).map((r) => r.map((p) => apply(cm, p)));
+      }
+      rings = rings.filter((r) => r.length >= 2);
+      if (rings.length) parts.push({ rings, open: open && op !== 'fill', op });
+    }
+  };
+  walk(root, parseTransform(root.attrs.transform), 0);
+  return { w, h, parts };
+}
+
+/** Vorlage aus SVG-Text (nur im Browser: braucht DOMParser). */
+export function svgToTemplate(text: string): Template | null {
+  const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+  const root = doc.documentElement;
+  if (!root || root.localName !== 'svg' || doc.querySelector('parsererror')) return null;
+  const t = nodeToTemplate(toNode(root));
+  return t.parts.length ? t : null;
 }

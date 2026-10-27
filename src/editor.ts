@@ -4,12 +4,16 @@ import { openTraceDialog } from './imageDialog';
 import { buildKeyboard } from './keyboard';
 import { saveSvg } from './exporter';
 import { openSaveDialog } from './saveDialog';
-import { svgToShape } from './svgImport';
+import { svgToShape, svgToTemplate } from './svgImport';
+import { Coach } from './guided/coach';
+import { openFinish } from './guided/dialogs';
+import type { Highlight, Snapshot } from './guided/engine';
+import { projectByNumber } from './guided/projects';
 import { bbox, dist, resample, shapeToPath, simplify, smooth, transformPoint, type Pt, type Ring, type Shape } from './geometry';
 import { ICONS, SHAPE_ICONS } from './icons';
 import { History, isTooThin, makeElement, newId, normalizeBase, pickElement, type Design, type El, type Op, type Settings, type Surface, worldShape } from './model';
 import { canvasBackground, elementMarkup } from './render';
-import { MAX_ZOOM, defaultSurface, isFree, isOutside, surfaceKey, surfaceSize, viewFor, zoomedView, type View } from './surface';
+import { MAX_ZOOM, defaultSurface, isFree, isOutside, rectSurface, surfaceKey, surfaceSize, viewFor, zoomedView, type View } from './surface';
 import { openSurfaceDialog } from './surfaceDialog';
 import { SHAPE_GROUPS, SHAPE_LABELS, baseShape, type ShapeId } from './shapes';
 import { GLYPH_HEIGHT, textShape } from './text';
@@ -66,8 +70,12 @@ export class Editor {
   private stage!: HTMLElement;
   private dims!: HTMLElement;
   private dimVal: Record<'w' | 'h' | 'rot', HTMLElement> = {} as never;
+  private dimBtn = {} as Record<'w' | 'h' | 'rot', HTMLButtonElement>;
   private lockAspect = true;
   private lockBtn!: HTMLButtonElement;
+  private coach: Coach | null = null;
+  /** in dieser Sitzung exportiert (für den Export-Schritt im geführten Modus) */
+  private exported = false;
   private onResize = () => this.render();
   private onHide = () => {
     if (document.visibilityState === 'hidden') void this.saveNow();
@@ -79,6 +87,7 @@ export class Editor {
     this.history = new History(o.design.elements);
     this.view = viewFor(o.design.surface, o.design.elements, null);
     this.build();
+    this.startCoach();
     this.setStatus(storage.persistent);
     window.addEventListener('resize', this.onResize);
     document.addEventListener('visibilitychange', this.onHide);
@@ -186,7 +195,7 @@ export class Editor {
     rail.append(
       group('var(--m-green)', this.btn.shapes, this.btn.draw),
       group('var(--m-blue)', this.btn.image, this.btn.svgfile, this.btn.search),
-      group('var(--m-pink)', button('btn labeled tool', lab(ICONS.text, 'Text'), () => this.openText(), 'Text')),
+      group('var(--m-pink)', (this.btn.text = button('btn labeled tool', lab(ICONS.text, 'Text'), () => this.openText(), 'Text'))),
     );
 
     this.stage = h('div', 'stage');
@@ -217,12 +226,83 @@ export class Editor {
     this.root.append(top, body);
   }
 
+  // ---------- Geführter Modus ----------
+  private startCoach(): void {
+    const g = this.o.design.guide;
+    const project = g ? projectByNumber(g.project) : undefined;
+    if (!g || !project) return;
+    this.coach = new Coach(project, g, {
+      snapshot: () => this.snapshot(),
+      targets: (k) => this.targetsFor(k),
+      action: (a) => {
+        if (a === 'surface') this.changeSurface();
+        else if (project.template) void this.loadTemplate(project.template);
+      },
+      changed: () => {
+        this.o.design.updated = Date.now();
+        this.scheduleSave();
+      },
+      finished: () => openFinish(project, () => void this.exit()),
+    });
+    this.stage.prepend(this.coach.el);
+  }
+
+  private snapshot(): Snapshot {
+    return {
+      elements: this.els,
+      selected: this.selected,
+      surface: this.surface,
+      exported: this.exported,
+      thin: (e) => this.thin(e),
+      outside: (e) => this.outside(e),
+    };
+  }
+
+  /** Tasten, die der Coach hervorhebt. */
+  private targetsFor(k: Highlight): HTMLElement[] {
+    const b = this.btn;
+    const map: Record<Highlight, (HTMLElement | undefined)[]> = {
+      shapes: [b.shapes], draw: [b.draw], image: [b.image], svg: [b.svgfile], search: [b.search], text: [b.text],
+      surface: [b.surface], export: [b.export], cut: [b['op-cut']], engrave: [b['op-engrave']], fill: [b['op-fill']],
+      width: [this.dimBtn.w], height: [this.dimBtn.h], lock: [this.lockBtn], font: [b.font], center: [b.center], zoom: [b.zoomFit], undo: [b.undo],
+    };
+    return map[k].filter((x): x is HTMLElement => !!x);
+  }
+
+  /** Vorlage (SVG in mm) einsetzen: Zeichenfläche wird so groß wie die Vorlage. */
+  private async loadTemplate(url: string): Promise<void> {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('nicht gefunden');
+      const t = svgToTemplate(await res.text());
+      if (!t) throw new Error('leer');
+      const name = url.split('/').pop()!.replace(/\.svg$/i, '');
+      const ref = `template:${name}`;
+      this.els = this.els.filter((e) => e.ref !== ref);
+      this.o.design.surface = rectSurface(t.w, t.h);
+      this.outsideCache.clear();
+      for (const p of t.parts) {
+        const b = bbox(p.rings);
+        const w = Math.max(b.maxX - b.minX, 0.01);
+        const hh = Math.max(b.maxY - b.minY, 0.01);
+        this.els.push(makeElement({ kind: 'graphic', ref, rings: p.rings, op: p.op, size: Math.max(w, hh), x: (b.minX + b.maxX) / 2, y: (b.minY + b.maxY) / 2, open: p.open || undefined, exact: { w, h: hh } }));
+      }
+      this.selectedId = null;
+      this.view = viewFor(this.surface, this.els, null);
+      this.zoomFit();
+      this.commit();
+    } catch {
+      if (this.coach) this.flash(this.root.querySelector('.coach-btn.act') ?? this.btn.surface);
+    }
+  }
+
   /** Leiste unter der Fläche: Breite, Höhe (mm), Seitenverhältnis sperren, Drehung. */
   private buildDims(): HTMLElement {
     this.dims = h('div', 'dims');
     const field = (kind: 'w' | 'h' | 'rot', icon: string, unit: string, label: string) => {
       const b = button('dim', `<span class="dim-ico">${icon}</span><span class="dim-val"></span><span class="dim-unit">${unit}</span>`, () => void this.editDim(kind), label);
       this.dimVal[kind] = b.querySelector('.dim-val') as HTMLElement;
+      this.dimBtn[kind] = b;
       return b;
     };
     this.lockBtn = button('dim lock active', ICONS.lock, () => {
@@ -230,8 +310,35 @@ export class Editor {
       this.lockBtn.innerHTML = this.lockAspect ? ICONS.lock : ICONS.unlock;
       this.lockBtn.classList.toggle('active', this.lockAspect);
     }, 'Seitenverhältnis');
-    this.dims.append(field('w', ICONS.arrowH, 'mm', 'Breite'), this.lockBtn, field('h', ICONS.arrowV, 'mm', 'Höhe'), field('rot', ICONS.rotate, '°', 'Drehung'));
+    this.btn.center = button('dim mitte', `<span class="dim-ico">${ICONS.center}</span><span class="dim-lbl">Mitte</span>`, () => this.centerSelected(), 'In die Mitte');
+    this.dims.append(field('w', ICONS.arrowH, 'mm', 'Breite'), this.lockBtn, field('h', ICONS.arrowV, 'mm', 'Höhe'), field('rot', ICONS.rotate, '°', 'Drehung'), this.btn.center);
     return this.dims;
+  }
+
+  /**
+   * Teil in die Mitte setzen: in die Mitte des nächstgrößeren Teils, in dem es liegt (z. B. Name auf dem Schild),
+   * sonst in die Mitte der Zeichenfläche.
+   */
+  private centerSelected(): void {
+    const e = this.selected;
+    if (!e) return;
+    let target: Pt | null = null;
+    let best = Infinity;
+    for (const o of this.els) {
+      if (o === e || o.w <= e.w || o.h <= e.h) continue;
+      const b = bbox(worldShape(o));
+      if (e.x < b.minX || e.x > b.maxX || e.y < b.minY || e.y > b.maxY) continue;
+      const area = (b.maxX - b.minX) * (b.maxY - b.minY);
+      if (area < best) {
+        best = area;
+        target = [(b.minX + b.maxX) / 2, (b.minY + b.maxY) / 2];
+      }
+    }
+    if (!target && !isFree(this.surface)) target = [this.surface.w / 2, this.surface.h / 2];
+    if (!target) return this.flash(this.btn.center);
+    e.x = target[0];
+    e.y = target[1];
+    this.commit();
   }
 
   private updateDims(): void {
@@ -340,6 +447,7 @@ export class Editor {
     window.removeEventListener('pagehide', this.onHide);
     cancelAnimationFrame(this.raf);
     clearTimeout(this.saveTimer);
+    this.coach?.destroy();
     this.root.remove();
   }
 
@@ -444,6 +552,7 @@ export class Editor {
     this.updateDims();
     const op = sel ? sel.op : this.currentOp;
     for (const o of ['cut', 'engrave', 'fill'] as Op[]) this.btn[`op-${o}`].classList.toggle('active', o === op);
+    this.coach?.update();
   }
 
   // ---------- Zeigerereignisse ----------
@@ -1022,6 +1131,8 @@ export class Editor {
         const result = await saveSvg(this.o.profile, this.o.design, this.settings, fileName);
         void this.saveNow();
         if (result === 'cancelled') return;
+        this.exported = true;
+        this.coach?.update(true);
         const o = overlay('overlay-dim');
         const card = h('div', 'send-card', `<div class="sent"><div class="plane drop">${ICONS.download}</div><div class="ok">${ICONS.check}</div></div>`);
         o.root.append(card);

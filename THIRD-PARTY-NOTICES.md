@@ -47,6 +47,10 @@ eindeutig sind, und dann `SET_CREDITS` in `src/online.ts` sowie eine Lizenzdatei
 - MINT2Go-Logo und -Name (`public/mint2go-logo.png`): Eigentum von MINT2Go.
 - App-Symbol (`public/*.png`) und Zierelemente (Zahnräder): selbst erzeugt (`scripts/make-icons.mjs`, `src/decor.ts`).
 
+## Laser-Werkstatt (Projekte, Bilder, Vorlagen)
+
+Projektbeschreibungen, Fotos (`public/werkstatt/pics/`) und Vorlagen (`public/werkstatt/vorlagen/`) stammen aus der MINT2Go Laser-Werkstatt (Material von MINT2Go, vom Projektauftraggeber für diese App bereitgestellt). Die Schritte im geführten Modus wurden für diese App neu formuliert.
+
 ## Entwicklungswerkzeuge (nicht Teil der ausgelieferten App)
 
 Vite, TypeScript, Vitest, @types/node (MIT bzw. Apache 2.0). Der QR-Code `docs/ipad-qr.png` wurde mit dem npm-Paket

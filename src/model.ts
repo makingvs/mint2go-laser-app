@@ -1,4 +1,5 @@
 // Datenmodell: Entwurf mit Elementen, alle Maße in Millimetern.
+import type { GuideState } from './guided/engine';
 import { bbox, distToPolyline, featureSize, pointInShape, transformShape, type Ring, type Shape, type Transform } from './geometry';
 
 export type Op = 'cut' | 'engrave' | 'fill';
@@ -41,6 +42,8 @@ export interface Design {
   elements: El[];
   /** fehlt bei älteren Arbeiten: dann Rechteck in Standardgröße */
   surface?: Surface;
+  /** Geführtes Projekt (Laser-Werkstatt): Nummer, aktueller Schritt, fertig */
+  guide?: GuideState;
 }
 
 export interface Settings {

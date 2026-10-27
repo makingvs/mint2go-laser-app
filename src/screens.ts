@@ -109,6 +109,7 @@ export function galleryScreen(
   settings: Settings,
   onBack: () => void,
   onOpen: (d: Design | null) => void,
+  onWerkstatt?: () => void,
 ): void {
   root.innerHTML = '';
   const screen = h('div', 'screen gallery-screen');
@@ -145,6 +146,7 @@ export function galleryScreen(
       const list = await storage.listDesigns(profile.id);
       grid.innerHTML = '';
       grid.append(button('card add-card wide', ICONS.plus, () => onOpen(null), 'Neu'));
+      if (onWerkstatt) grid.append(button('card werk-entry wide', '<span class="emoji">🛠️</span><span class="cap">Laser-Werkstatt</span>', onWerkstatt, 'Laser-Werkstatt'));
       for (const d of list) {
         const card = h('div', 'card work-card');
         const open = button('work-open', thumbnailSvg(d, settings), () => onOpen(d), 'Öffnen');
@@ -161,6 +163,7 @@ export function galleryScreen(
           ext: 'svg',
           onSave: (fileName) => void saveSvg(profile, d, settings, fileName),
         }), 'Exportieren');
+        if (d.guide) card.append(h('div', 'work-badge' + (d.guide.done ? ' done' : ''), `${d.guide.done ? '✓' : '🛠️'} ${d.guide.project}`));
         card.append(open, h('div', 'work-actions', '')); card.querySelector('.work-actions')!.append(exp, del);
         grid.append(card);
       }
