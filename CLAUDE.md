@@ -113,7 +113,8 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 - Aufbau: app3d/index.html + app3d/src/ (Quellen), app3d/public/ (Manifest, Icons, config.json mit Bett/Düse); Build `vite.3d.config.ts` -> dist/3d/ mit eigenem Service Worker (`node scripts/make-sw.mjs 3d`, eigener Cache-Name)
 - Befehle: `npm run dev:3d` (Port 5174), `npm run build` baut beide Apps; Tests liegen in tests/ (importieren aus ../app3d/src)
 - Koordinaten: Ursprung Mitte Druckbett, x rechts, y hinten, z oben (z = 0 ist das Bett), Maße in mm
-- Reine Logik ohne three.js (testbar): app3d/src/bed.ts (Bauraum), app3d/src/orbit.ts (Kamera); Ansicht: app3d/src/view3d.ts
+- Reine Logik ohne three.js (testbar): bed.ts (Bauraum), orbit.ts (Kamera), mesh.ts (8 Grundkörper als geschlossene Dreiecksnetze im Einheitsquader), model3d.ts (Part, Maße/Grenzen/freier Platz), gizmo.ts (Rechnung der Griffe), history.ts (Rückgängig); Darstellung/Gesten: view3d.ts, Oberfläche: editor3d.ts, Symbole: icons3d.ts
+- Bedienung 3D: linke Leiste = Körper setzen (Würfel, Kugel, Zylinder, Kegel, Pyramide, Dach, Kuppel, Ring); Antippen wählt, Ziehen verschiebt (rastet auf 1 mm); Griffe am gewählten Körper: orange Ecke = Größe, blau oben = Höhe, rosa Ring = Drehen (5°-Raster); Maße-Leiste: Breite/Tiefe/Höhe/Drehung/Abstand zum Bett (Zahlentastatur aus src/numpad.ts), Schloss = gleichmäßig skalieren (Standard an), Mitte; Körper außerhalb des Bauraums rot + Warnzeichen (kein Zwang)
 - Phasen 3D: 1 Gerüst + Ansicht · 2 Körper platzieren/skalieren/drehen · 3 Zeichnen + Höhe · 4 Kombinieren (CSG) · 5 Export STL/3MF + Druckprüfung · 6 Profile/Galerie/Speichern/Lehrkraft · 7 Feinschliff/Klassentest
 - Offen: Druckermodell (Standard 220 x 220 x 250 mm, Düse 0,4 mm in app3d/public/config.json), eigenes App-Symbol für 3D (aktuell Kopie der Laser-App)
 
