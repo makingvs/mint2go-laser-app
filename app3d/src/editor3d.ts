@@ -4,8 +4,11 @@ import { ICONS } from '../../src/icons';
 import { formatNumber, openNumpad } from '../../src/numpad';
 import type { Shape } from '../../src/geometry';
 import type { PrinterSettings } from './bed';
+import { saveFile } from '../../src/exporter';
+import { openSaveDialog } from '../../src/saveDialog';
 import { combine } from './csg';
-import { openKindPicker, openShapePicker, openSketch, openTextDialog, pickSvg } from './dialogs3d';
+import { openExportPanel, openKindPicker, openShapePicker, openSketch, openTextDialog, pickSvg, type ExportFormat } from './dialogs3d';
+import { bedCorner, buildFinal, printCheck, to3mf, toStl } from './printExport';
 import { History } from './history';
 import { ICONS3D, KIND_ICONS } from './icons3d';
 import type { PartKind } from './mesh';
@@ -36,7 +39,8 @@ export class Editor3d {
   private selectedId: string | null = null;
   private history = new History<Part[]>([]);
   private lock = true;
-  private btn = {} as Record<'undo' | 'redo' | 'copy' | 'del' | 'hole' | 'merge', HTMLButtonElement>;
+  private btn = {} as Record<'undo' | 'redo' | 'copy' | 'del' | 'hole' | 'merge' | 'export', HTMLButtonElement>;
+  private format: ExportFormat = 'stl';
   private dimEls = new Map<DimField, HTMLElement>();
   private dims!: HTMLElement;
   private lockBtn!: HTMLButtonElement;
@@ -53,6 +57,7 @@ export class Editor3d {
     this.btn.del = button('btn labeled danger', lab(ICONS.trash, 'Löschen'), () => void this.remove(), 'Löschen');
     this.btn.hole = button('btn labeled', lab(ICONS3D.hole, 'Loch'), () => this.toggleHole(), 'Loch');
     this.btn.merge = button('btn labeled', lab(ICONS3D.merge, 'Vereinen'), () => void this.merge(), 'Vereinen');
+    this.btn.export = button('btn send labeled', lab(ICONS.share, 'Export'), () => void this.exportModel(), 'Exportieren');
     this.status = h('div', 'status', ICONS.warn);
     const home = button('btn labeled', lab(ICONS3D.home, 'Ansicht'), () => this.view.resetView(), 'Ansicht zurücksetzen');
     const group = h('div', 'top-group');
@@ -60,7 +65,7 @@ export class Editor3d {
     const groupCombine = h('div', 'top-group');
     groupCombine.append(this.btn.hole, this.btn.merge);
     const group2 = h('div', 'top-group');
-    group2.append(this.status, home);
+    group2.append(this.status, home, this.btn.export);
     top.append(logo, h('div', 'top-center'), groupCombine, group, group2);
 
     const body = h('div', 'editor-body');
@@ -173,6 +178,26 @@ export class Editor3d {
     this.parts = [...this.parts.filter((q) => !r.ids.includes(q.id)), ...(r.part ? [r.part] : [])];
     this.selectedId = r.part?.id ?? null;
     this.commit();
+  }
+
+  // ---------- Exportieren ----------
+  /** Druckprüfung zeigen, Dateiart wählen, Dateiname vom Kind tippen lassen, speichern (STL/3MF). */
+  private async exportModel(): Promise<void> {
+    const busy = overlay('overlay-dim');
+    busy.root.append(h('div', 'confirm-card', `<div class="spinner">${ICONS.gear}</div>`));
+    const model = await buildFinal(this.parts).catch(() => 'error' as const);
+    busy.close();
+    if (!model || model === 'error') return notify(ICONS.warn); // nichts zu drucken oder ein Körper ist nicht in Ordnung
+    const fmt = await openExportPanel(printCheck(this.parts, model, this.printer.bed, this.printer.nozzle), this.format);
+    if (!fmt) return;
+    this.format = fmt;
+    const shift = bedCorner(this.printer.bed);
+    openSaveDialog({
+      ext: fmt,
+      icon: ICONS.share,
+      // direkt im Tipp auf ✓: nur so darf das Teilen-Menü (iPad) geöffnet werden
+      onSave: (name) => void saveFile(name, fmt === 'stl' ? toStl(model, shift) : to3mf(model, shift), fmt === 'stl' ? 'model/stl' : 'model/3mf'),
+    });
   }
 
   private async pickKind(): Promise<void> {

@@ -30,7 +30,7 @@ export type CombineResult =
 
 const TOUCH_TOLERANCE = 0.05; // mm
 
-function toManifold(m: ManifoldToplevel, p: Part): Manifold | null {
+export function toManifold(m: ManifoldToplevel, p: Part): Manifold | null {
   try {
     const mesh = new m.Mesh({ numProp: 3, vertProperties: new Float32Array(worldVertices(p)), triVerts: new Uint32Array(meshOf(p).idx) });
     const man = new m.Manifold(mesh);

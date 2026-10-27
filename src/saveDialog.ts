@@ -8,7 +8,7 @@ import { sanitizeFileName } from './names';
 
 export interface SaveDialogOptions {
   /** Dateiendung ohne Punkt, z. B. "svg" oder "zip" */
-  ext: 'svg' | 'zip';
+  ext: 'svg' | 'zip' | 'stl' | '3mf';
   /** Symbol im Kopf des Dialogs */
   icon?: string;
   /** Wird mit dem vollständigen Dateinamen (inkl. Endung) aufgerufen */

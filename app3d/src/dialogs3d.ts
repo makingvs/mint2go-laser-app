@@ -9,7 +9,8 @@ import { SHAPE_GROUPS, SHAPE_LABELS, baseShape, type ShapeId } from '../../src/s
 import { svgToShape } from '../../src/svgImport';
 import { GLYPH_HEIGHT, textShape } from '../../src/text';
 import { grayFromRGBA, traceGray } from '../../src/trace';
-import { KIND_ICONS } from './icons3d';
+import { ICONS3D, KIND_ICONS } from './icons3d';
+import type { PrintCheck } from './printExport';
 import { KIND_LABELS, PART_KINDS, type PartKind } from './mesh';
 
 // ---------- Körper ----------
@@ -344,4 +345,48 @@ export function pickSvg(onShape: (shape: Shape) => void, onBad: () => void): voi
     }
   });
   input.click();
+}
+
+// ---------- Export: Druckprüfung und Dateiart ----------
+export type ExportFormat = 'stl' | '3mf';
+
+/**
+ * Druckprüfung ohne Text: je Prüfung ein Symbol mit grünem Haken (in Ordnung) oder orangem Warnzeichen,
+ * dazu die Wahl STL / 3MF. Warnungen sperren nichts. Liefert die Dateiart oder null (Abbrechen).
+ */
+export function openExportPanel(check: PrintCheck, initial: ExportFormat): Promise<ExportFormat | null> {
+  return new Promise((resolve) => {
+    const o = overlay('overlay-dim');
+    const panel = h('div', 'panel export-panel');
+    let fmt = initial;
+    const done = (v: ExportFormat | null) => {
+      o.close();
+      resolve(v);
+    };
+    const cards = h('div', 'chk-row');
+    const card = (icon: string, warn: boolean, label: string) => {
+      const c = h('div', `chk ${warn ? 'warn' : 'ok'}`, `<span class="chk-ico">${icon}</span><span class="badge">${warn ? ICONS.warn : ICONS.check}</span>`);
+      c.setAttribute('role', 'img');
+      c.setAttribute('aria-label', label + (warn ? ': Achtung' : ': in Ordnung'));
+      cards.append(c);
+    };
+    card(ICONS3D.bed, check.outside, 'Bauraum');
+    card(ICONS3D.lift, check.floating, 'Schwebt');
+    card(ICONS3D.thin, check.thin, 'Dünne Stellen');
+
+    const fmts = h('div', 'fmt-row');
+    const chips: [ExportFormat, HTMLButtonElement][] = (['stl', '3mf'] as const).map((f) => [
+      f,
+      button('fmt-chip' + (f === fmt ? ' active' : ''), f.toUpperCase(), () => {
+        fmt = f;
+        chips.forEach(([k, b]) => b.classList.toggle('active', k === f));
+      }, f.toUpperCase()),
+    ]);
+    chips.forEach(([, b]) => fmts.append(b));
+
+    const head = h('div', 'panel-head');
+    head.append(button('btn', ICONS.cross, () => done(null), 'Abbrechen'), h('div', 'spacer'), button('btn send', ICONS.check, () => done(fmt), 'Weiter'));
+    panel.append(head, cards, fmts);
+    o.root.append(panel);
+  });
 }
