@@ -1,0 +1,4 @@
+{
+  "bed": { "width": 220, "depth": 220, "height": 250 },
+  "nozzle": 0.4
+}
