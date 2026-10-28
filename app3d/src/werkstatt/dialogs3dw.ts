@@ -23,6 +23,9 @@ function panel(cls: string): { o: ReturnType<typeof overlay>; box: HTMLElement }
   return { o, box };
 }
 
+/** Bild des fertigen Projekts (Original-Bilder der Werkstatt, public/werkstatt/pics/NN.jpg). */
+export const pic = (p: Project): string => `werkstatt/pics/${String(p.n).padStart(2, '0')}.jpg`;
+
 /** Chips: Bauzeit, Druckzeit, Schwierigkeit. */
 export function chips(p: Project): string {
   const dots = Array.from({ length: 5 }, (_, i) => `<i class="${i < p.d ? 'on' : ''}"></i>`).join('');
