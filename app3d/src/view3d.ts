@@ -25,8 +25,13 @@ const COLORS = {
   hLift: 0x3a9d23,
 };
 
-const HANDLE_PX = 15; // sichtbarer Radius der Griffe in Pixeln
-const HIT_PX = 34; // Trefferradius (Finger sind dick)
+const HANDLE_PX = 18; // sichtbarer Radius der Griffe in Pixeln
+const HIT_PX = 44; // Trefferradius (Finger sind dick)
+// Abstände der Griffe vom Körper in Bildschirm-Pixeln: So liegen sie auch bei kleinen Körpern weit genug auseinander
+const GAP_HEIGHT = 56; // Höhen-Griff über der Oberseite
+const GAP_SIZE = 40; // Größen-Griff außerhalb der Ecke
+const GAP_LIFT = 64; // Anheben-Griff links neben dem Körper
+const RING_MIN = 92; // kleinster Radius des Dreh-Rings
 
 /** Gleiche Schlüssel = gleiche Form (Grundkörper nach Art, gezeichnete Körper nach Umriss-Nummer). */
 const geometryKey = (p: Part): string => (p.kind === 'extrude' ? `x:${p.outline?.id}` : p.kind === 'mesh' ? `m:${p.meshId}` : p.kind);
@@ -47,6 +52,7 @@ interface Drag {
   start: Part;
   grab: [number, number]; // Bodenpunkt beim Start (Ebene z = start.z)
   grabZ: number; // Höhe auf der senkrechten Linie beim Start (Höhen- und Anheben-Griff)
+  liftExtra: number; // Abstand des Anheben-Griffs beim Start des Ziehens
   resting: boolean; // Verschieben: liegt der Körper auf dem, was unter ihm ist? Dann fällt er beim Schieben auf die neue Auflage
   offset: [number, number]; // Verschieben: Abstand zwischen Mitte und Bodenpunkt
 }
@@ -75,6 +81,7 @@ export class View3d {
   private hRotate!: THREE.Mesh;
   private hLift!: THREE.Mesh;
   private liftLine!: THREE.Line;
+  private liftExtra = 0; // Abstand des Anheben-Griffs von der Seitenwand (mm), zuletzt gezeichnet
   private hitLift!: THREE.Mesh;
   private ring!: THREE.LineLoop;
   private hitSize!: THREE.Mesh;
@@ -320,7 +327,7 @@ export class View3d {
     this.handles.visible = false;
   }
 
-  /** Griffe an den gewählten Körper setzen; Größe in Pixeln bleibt immer gleich. */
+  /** Griffe an den gewählten Körper setzen. Größe und Abstand in Pixeln bleiben immer gleich (auch bei kleinen Körpern und beim Zoomen). */
   private placeHandles(): void {
     const p = this.parts.find((q) => q.id === this.selectedId);
     this.handles.visible = !!p;
@@ -340,17 +347,23 @@ export class View3d {
       hit.position.copy(at);
       hit.scale.setScalar(HIT_PX * k);
     };
-    // Größe: untere Ecke (+w/2, +d/2); Höhe: über der Mitte; Drehen: auf dem Ring vor dem Körper
-    put(this.hSize, this.hitSize, local(p.w / 2, p.d / 2, p.z));
+    const mid = new THREE.Vector3(p.x, p.y, p.z + p.h / 2);
+    const k = pxToWorld(mid); // mm pro Pixel in Höhe des Körpers
+    // Höhe: über der Mitte
     const top = new THREE.Vector3(p.x, p.y, p.z + p.h);
-    top.z += HANDLE_PX * 2.2 * pxToWorld(top);
+    top.z += GAP_HEIGHT * pxToWorld(top);
     put(this.hHeight, this.hitHeight, top);
-    const R = Math.hypot(p.w, p.d) / 2 + 8;
+    // Größe: Ecke (+w/2, +d/2) auf dem Bett, ein Stück nach außen (Diagonale)
+    const out = (GAP_SIZE * k) / Math.SQRT2;
+    put(this.hSize, this.hitSize, local(p.w / 2 + out, p.d / 2 + out, p.z));
+    // Drehen: auf einem Ring vor dem Körper, mindestens RING_MIN Pixel Radius
+    const R = Math.max(Math.hypot(p.w, p.d) / 2 + 16 * k, RING_MIN * k);
     this.ring.position.set(p.x, p.y, p.z + 0.05);
     this.ring.scale.set(R, R, 1);
     put(this.hRotate, this.hitRotate, local(0, -R, p.z + 0.05));
-    // Anheben: Mitte der linken Seitenwand, auf halber Höhe; die Linie führt von dort zum Bett
-    const [lx, ly] = liftHandleXY(p);
+    // Anheben: links neben dem Körper auf halber Höhe; die Linie führt von dort zum Bett
+    this.liftExtra = GAP_LIFT * k;
+    const [lx, ly] = liftHandleXY(p, this.liftExtra);
     put(this.hLift, this.hitLift, new THREE.Vector3(lx, ly, p.z + p.h / 2));
     const pos = this.liftLine.geometry.getAttribute('position') as THREE.BufferAttribute;
     pos.setXYZ(0, lx, ly, 0.05);
@@ -439,12 +452,12 @@ export class View3d {
   private beginDrag(kind: DragKind, p: Part, e: PointerEvent): void {
     const g = this.groundAt(e.clientX, e.clientY, p.z) ?? [p.x, p.y];
     const ray = this.setRay(e.clientX, e.clientY);
-    const [vx, vy] = kind === 'lift' ? liftHandleXY(p) : [p.x, p.y]; // senkrechte Linie, an der gezogen wird
+    const [vx, vy] = kind === 'lift' ? liftHandleXY(p, this.liftExtra) : [p.x, p.y]; // senkrechte Linie, an der gezogen wird
     const gz = closestZOnVertical(ray.o, ray.d, vx, vy) ?? p.z + p.h;
     const start = { ...p };
     // Löcher sind Schneidwerkzeuge: sie fallen nicht auf andere Körper, sondern bleiben, wo man sie hinsetzt
     const resting = kind === 'move' && !p.hole && Math.abs(p.z - supportHeight(start, this.others(p.id), start)) < 0.05;
-    this.drag = { kind, id: p.id, start, grab: g, grabZ: gz, resting, offset: [p.x - g[0], p.y - g[1]] };
+    this.drag = { kind, id: p.id, start, grab: g, grabZ: gz, liftExtra: this.liftExtra, resting, offset: [p.x - g[0], p.y - g[1]] };
   }
 
   private others(id: string): Part[] {
@@ -492,7 +505,7 @@ export class View3d {
       if (z !== null) next = resizeHeight(s, z - dr.grabZ, this.lock);
     } else if (dr.kind === 'lift') {
       const ray = this.setRay(e.clientX, e.clientY);
-      const [vx, vy] = liftHandleXY(s);
+      const [vx, vy] = liftHandleXY(s, dr.liftExtra);
       const z = closestZOnVertical(ray.o, ray.d, vx, vy);
       if (z !== null) next = { ...s, z: liftZ(s.z, z - dr.grabZ, s.h, supportHeight(s, this.others(s.id), s), this.bed.height) };
     } else {

@@ -106,5 +106,7 @@ describe('Einrasten und Anheben', () => {
     const [x, y] = liftHandleXY({ x: 10, y: 20, rot: 90, w: 40 });
     expect(x).toBeCloseTo(10, 9);
     expect(y).toBeCloseTo(0, 9);
+    // mit Abstand: weiter links neben der Wand (hier 30 mm)
+    expect(liftHandleXY({ x: 10, y: 20, rot: 0, w: 40 }, 30)).toEqual([-40, 20]);
   });
 });

@@ -29,8 +29,6 @@ export const ICONS3D = {
   tilt: svg('<path d="M7 17 5 9l8-2 2 8z" fill="currentColor" fill-opacity=".14"/><path d="M4 20h16"/>'),
   mirror: svg('<path d="M12 3v18" stroke-dasharray="2.5 2.5"/><path d="M9 7 4 17h5zM15 7l5 10h-5z" fill="currentColor" fill-opacity=".14"/>'),
   align: svg('<path d="M12 3v18"/><rect x="4.5" y="6" width="15" height="4" rx="1"/><rect x="8" y="14" width="8" height="4" rx="1"/>'),
-  speaker: svg('<path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor" fill-opacity=".14"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>'),
-  lamp: svg('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>'),
 };
 
 /** Sonderkörper in der Körper-Auswahl: Röhre und Zahnrad */

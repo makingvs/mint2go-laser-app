@@ -64,10 +64,11 @@ export function rotateFromGround(start: Part, grab: [number, number], now: [numb
   return { ...start, rot: normalizeRot(snapDeg > 0 ? Math.round(deg / snapDeg) * snapDeg : deg) };
 }
 
-/** Stelle auf dem Körper, an der der Anheben-Griff sitzt: Mitte der linken Seitenwand (Weltkoordinaten x, y). */
-export function liftHandleXY(p: Pick<Part, 'x' | 'y' | 'rot' | 'w'>): [number, number] {
+/** Stelle, an der der Anheben-Griff sitzt: links neben der Seitenwand, `extra` mm davon entfernt (Weltkoordinaten x, y). */
+export function liftHandleXY(p: Pick<Part, 'x' | 'y' | 'rot' | 'w'>, extra = 0): [number, number] {
   const a = (p.rot * Math.PI) / 180;
-  return [p.x - (p.w / 2) * Math.cos(a), p.y - (p.w / 2) * Math.sin(a)];
+  const r = p.w / 2 + extra;
+  return [p.x - r * Math.cos(a), p.y - r * Math.sin(a)];
 }
 
 /**

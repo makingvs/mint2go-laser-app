@@ -40,7 +40,7 @@ interface At {
   dz?: number;
 }
 
-/** "Zeig-mir"-Hilfe: was die Hilfe-Taste für das Kind erledigt. */
+/** Lösungsweg eines Schritts als Aktionen (nicht in der Oberfläche sichtbar; tests/werkstatt.test.ts spielt damit jedes Projekt durch). */
 export type HelpOp =
   | ({ op: 'add'; kind: PartKind | 'tube' | 'gear'; w?: number; d?: number; h?: number; teeth?: number; hole?: boolean } & At)
   | ({ op: 'shape'; id: string; longest?: number; h?: number; hole?: boolean } & At)
@@ -68,7 +68,7 @@ export interface Step {
   check?: Check;
   /** Hinweis, wenn fast richtig */
   hint?: (s: Snapshot) => string | null;
-  /** Zeig-mir-Hilfe */
+  /** Lösungsweg (nur für den automatischen Durchspiel-Test) */
   help?: HelpOp[];
   /** Warnung (rot) zu diesem Schritt */
   warn?: string;

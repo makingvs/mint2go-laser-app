@@ -3,7 +3,7 @@ import { cdLineMarkup, gearsMarkup } from '../../../src/decor';
 import { button, h, overlay } from '../../../src/dom';
 import { ICONS } from '../../../src/icons';
 import type { Design } from '../storage3d';
-import { chips, openRules } from './dialogs3dw';
+import { chips, openRules, pic } from './dialogs3dw';
 import type { Project } from './engine3d';
 import { LEVELS, PROJECTS } from './projects3d';
 
@@ -52,7 +52,7 @@ export function werkstattScreen(root: HTMLElement, designs: Design[], on: Werkst
       const pr = progressOf(p, d);
       const card = button(
         'werk-card' + (pr >= 1 ? ' done' : pr > 0 ? ' going' : ''),
-        `<span class="werk-pic"><span class="werk-emoji">${p.emoji}</span><b class="werk-num">${p.n}</b>${pr >= 1 ? '<i class="werk-tick">⭐</i>' : ''}</span>` +
+        `<span class="werk-pic"><img src="${pic(p)}" alt="" draggable="false" loading="lazy"><b class="werk-num">${p.n}</b>${pr >= 1 ? '<i class="werk-tick">⭐</i>' : ''}</span>` +
           `<span class="werk-name">${p.title.replace(/^Mein(e|en)? /, '')}</span>` +
           (pr > 0 && pr < 1 ? `<span class="werk-bar"><i style="width:${Math.round(pr * 100)}%"></i></span>` : ''),
         () => openProject(p, d, on),
@@ -72,7 +72,7 @@ function openProject(p: Project, existing: Design | undefined, on: WerkstattHand
   const box = h('div', 'panel guide-panel start');
   box.style.setProperty('--lv', LEVELS[p.lv].color);
   const going = existing?.guide && !existing.guide.done;
-  box.append(button('btn guide-close', ICONS.cross, () => o.close(), 'Schließen'), h('div', 'start-pic start-emoji', p.emoji), h('div', 'start-main'));
+  box.append(button('btn guide-close', ICONS.cross, () => o.close(), 'Schließen'), h('div', 'start-pic', `<img src="${pic(p)}" alt="" draggable="false">`), h('div', 'start-main'));
   const main = box.querySelector('.start-main') as HTMLElement;
   main.append(h('div', 'start-lv', `Stufe ${p.lv} · ${LEVELS[p.lv].name}`), h('h2', '', `${p.n}. ${p.title}`), h('p', 'start-k', p.k), h('div', 'chips', chips(p)));
   if (p.warn) main.append(h('div', 'note warn', `⚠️ ${p.warn}`));

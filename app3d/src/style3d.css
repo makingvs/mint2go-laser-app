@@ -1027,25 +1027,9 @@ input {
 }
 
 /* ---------- 3D-Werkstatt ---------- */
-.werk-pic {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.werk-emoji {
-  font-size: 64px;
-  line-height: 1;
-}
 .werk-tick {
   font-size: 18px;
   background: #fff4e0;
-}
-.start-emoji {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 110px;
-  line-height: 1;
 }
 .werk-stars {
   margin-left: 14px;
@@ -1054,29 +1038,199 @@ input {
   font-weight: 800;
   color: var(--m-orange);
 }
-.coach-btn.voice {
-  width: 36px;
-  height: 36px;
-  border-radius: 12px;
-  display: flex;
+
+/* ---------- Erklärung als Pop-up über der 3D-Ansicht (auf-/zuklappbar, animiert) ---------- */
+.stage .coach {
+  position: absolute;
+  z-index: 5;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: block;
+  padding: 0;
+  gap: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  pointer-events: none;
+}
+.stage .coach.closed {
+  right: auto;
+}
+.stage .coach > * {
+  pointer-events: auto;
+}
+.coach-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  grid-template-areas: 'ico body nav' 'dots dots dots';
   align-items: center;
-  justify-content: center;
+  gap: 2px 12px;
+  padding: 8px 12px 6px;
+  border-radius: 22px;
+  background: #fff;
+  border-left: 8px solid var(--m-orange);
+  box-shadow: 0 0 0 2px var(--line) inset, 0 10px 26px rgba(47, 58, 95, 0.3);
+  transform-origin: top left;
+  transition: background 0.25s, border-color 0.25s;
 }
-.coach-btn.voice .icon {
-  width: 22px;
-  height: 22px;
+.coach.ok .coach-card {
+  border-left-color: var(--m-green);
+  background: #f6fbe8;
 }
-.coach-btn.voice.off {
-  opacity: 0.45;
+.coach-card[hidden],
+.coach-pill[hidden] {
+  display: none;
 }
+.coach-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 56px;
+  padding: 0 16px 0 12px;
+  border-radius: 28px;
+  background: #fff;
+  border-left: 7px solid var(--m-orange);
+  box-shadow: 0 0 0 2px var(--line) inset, 0 8px 20px rgba(47, 58, 95, 0.3);
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--ink);
+  transform-origin: top left;
+  animation: pill-bob 2.4s ease-in-out infinite;
+}
+.coach.ok .coach-pill {
+  border-left-color: var(--m-green);
+  background: #f6fbe8;
+}
+.pill-ico {
+  font-size: 30px;
+  line-height: 1;
+}
+.pill-chev {
+  width: 10px;
+  height: 10px;
+  margin-left: 2px;
+  border-right: 3px solid var(--muted);
+  border-bottom: 3px solid var(--muted);
+  transform: rotate(45deg) translate(-2px, -2px);
+}
+.coach-btn.mini .chev {
+  transform: rotate(180deg);
+}
+.pop-in {
+  animation: coach-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.coach-pill.pop-in {
+  animation: coach-pop 0.4s cubic-bezier(0.2, 1.4, 0.4, 1), pill-bob 2.4s 0.4s ease-in-out infinite;
+}
+@keyframes coach-pop {
+  from { transform: scale(0.55) translateY(-14px); opacity: 0; }
+}
+@keyframes pill-bob {
+  0%, 100% { translate: 0 0; }
+  50% { translate: 0 -3px; }
+}
+/* neuer Schritt: das große Bild hüpft, Überschrift und Text gleiten herein */
 .coach-ico {
-  cursor: pointer;
+  animation: ico-float 2.6s ease-in-out infinite;
 }
-.coach-btn.act .ico .icon {
-  width: 100%;
-  height: 100%;
+.coach-ico.step-in {
+  animation: ico-hop 0.8s cubic-bezier(0.3, 1.5, 0.5, 1), ico-float 2.6s 0.8s ease-in-out infinite;
+}
+.coach-title.step-in,
+.coach-text.step-in {
+  animation: text-slide 0.45s ease-out both;
+}
+.coach-text.step-in {
+  animation-delay: 0.08s;
+}
+@keyframes ico-hop {
+  0% { transform: translateY(-26px) scale(0.5) rotate(-18deg); opacity: 0; }
+  55% { transform: translateY(5px) scale(1.18) rotate(8deg); opacity: 1; }
+  100% { transform: none; }
+}
+@keyframes ico-float {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  50% { transform: translateY(-3px) rotate(-3deg); }
+}
+@keyframes text-slide {
+  from { opacity: 0; transform: translateX(-16px); }
+}
+/* geschafft: Haken-Hinweis poppt, Sterne sprühen */
+.coach-note.good {
+  animation: note-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes note-pop {
+  from { transform: scale(0.4); opacity: 0; }
+}
+.coach.ok .coach-ico {
+  animation: ico-tada 0.9s ease-in-out;
+}
+@keyframes ico-tada {
+  0%, 100% { transform: none; }
+  20% { transform: scale(1.25) rotate(-8deg); }
+  40% { transform: scale(1.25) rotate(8deg); }
+  60% { transform: scale(1.15) rotate(-5deg); }
+  80% { transform: scale(1.15) rotate(5deg); }
+}
+.burst {
+  position: absolute;
+  left: 34px;
+  top: 34px;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+.burst i {
+  position: absolute;
+  left: -10px;
+  top: -10px;
+  font-style: normal;
+  font-size: 20px;
+  animation: burst-fly 1s ease-out forwards;
+}
+@keyframes burst-fly {
+  from { transform: rotate(var(--a)) translateY(-8px) scale(0.4); opacity: 1; }
+  to { transform: rotate(var(--a)) translateY(-70px) scale(1.1); opacity: 0; }
+}
+.coach-dots i.now {
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+@keyframes dot-pulse {
+  50% { transform: scaleY(1.6); }
+}
+/* Zeigefinger an der Taste, die als Nächstes dran ist */
+.guide-pulse::after {
+  content: '👆';
+  position: absolute;
+  right: 0;
+  bottom: -6px;
+  font-size: 26px;
+  line-height: 1;
+  pointer-events: none;
+  filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.3));
+  animation: point-bounce 0.9s ease-in-out infinite;
+}
+@keyframes point-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+@media (max-height: 640px) {
+  .coach-card { padding: 4px 10px 3px; border-radius: 18px; }
+  .coach-pill { height: 44px; font-size: 17px; }
+  .pill-ico { font-size: 24px; }
+  .burst { left: 26px; top: 26px; }
+  .guide-pulse::after { font-size: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .coach-card, .coach-pill, .pop-in, .coach-ico, .coach-title, .coach-text, .coach-note, .coach-dots i, .guide-pulse::after, .burst i {
+    animation: none !important;
+  }
 }
 @media (max-height: 640px) {
   .tilt-pad { grid-template-columns: repeat(3, 46px); grid-template-rows: repeat(2, 46px); }
-  .werk-emoji { font-size: 46px; }
 }

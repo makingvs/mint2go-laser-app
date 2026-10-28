@@ -13,8 +13,7 @@ import { MAX_TEETH, MIN_TEETH } from './shapes3d';
 import { alignCenter, copyOffset, mirrorPart, tiltPart } from './transform';
 import { Coach } from './werkstatt/coach3d';
 import { openFinish } from './werkstatt/dialogs3dw';
-import type { GuideState, Highlight, HelpOp, Snapshot } from './werkstatt/engine3d';
-import { runHelp } from './werkstatt/help';
+import type { GuideState, Highlight, Snapshot } from './werkstatt/engine3d';
 import { projectByNumber } from './werkstatt/projects3d';
 import type { PartKind } from './mesh';
 import { MAX_SIZE, MIN_SIZE, applyDim, centered, cloneParts, createPart, findFreeSpot, isOutside, makeGearPart, makeOutlinePart, makeTubePart, newId, type DimField, type OutlineSize, type Part } from './model3d';
@@ -465,7 +464,6 @@ export class Editor3d {
     this.coach = new Coach(project, g as GuideState, {
       snapshot: () => this.snapshot(),
       targets: (k) => this.targets(k),
-      help: (ops) => this.runGuideHelp(ops),
       changed: () => {
         this.design.guide = g;
         this.scheduleSave();
@@ -513,16 +511,4 @@ export class Editor3d {
     }
   }
 
-  /** Zeig-mir-Hilfe: führt die Schritte der Hilfe für das Kind aus. */
-  private async runGuideHelp(ops: HelpOp[]): Promise<void> {
-    const busy = busyOverlay();
-    try {
-      const r = await runHelp({ parts: this.parts, selected: this.selectedId }, ops, this.printer.bed);
-      this.parts = r.parts;
-      this.selectedId = r.selected;
-    } finally {
-      busy.close();
-    }
-    this.commit();
-  }
 }
