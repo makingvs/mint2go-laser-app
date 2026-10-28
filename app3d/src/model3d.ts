@@ -4,6 +4,7 @@ import { fitsInBuildVolume, type Bed, type Box3 } from './bed';
 import { normalizeOutline, outlineMesh } from './extrude';
 import { KIND_SIZE, unitMesh, type PartKind, type TriMesh } from './mesh';
 import { getMesh } from './meshStore';
+import { MAX_TEETH, MIN_TEETH, gearShape, tubeShape } from './shapes3d';
 
 /** Umriss eines gezeichneten Körpers (normiert, siehe extrude.ts); die Nummer dient dem Zwischenspeicher. */
 export interface Outline {
@@ -20,6 +21,12 @@ export interface Part {
   meshId?: string;
   /** Loch: wird nicht gedruckt, sondern schneidet beim Vereinen aus den anderen Körpern aus */
   hole?: boolean;
+  /** Herkunft für die 3D-Werkstatt: 'text', 'sketch', 'svg', 'shape:<id>', 'tube', 'gear' (bleibt beim Kippen/Spiegeln/Vereinen-Teilen erhalten) */
+  tag?: string;
+  /** Zahnrad: Anzahl der Zähne */
+  teeth?: number;
+  /** Wie weit der Körper gekippt wurde (Grad um die x- und die y-Achse, zusammengezählt; siehe transform.ts) */
+  tilt?: { x: number; y: number };
   x: number; // Mitte, mm
   y: number;
   z: number; // Abstand des Bodens zum Bett (0 = liegt auf dem Bett)
@@ -61,7 +68,7 @@ export type OutlineSize = { longest: number } | { scale: number };
  * Körper aus einem gezeichneten Umriss (Form aus der Laser-App: y nach unten, beliebige Einheit).
  * `size`: längste Seite in mm oder mm pro Einheit. Die Größe wird auf das Bett begrenzt. null bei leerer Form.
  */
-export function makeOutlinePart(source: Shape, size: OutlineSize, height: number, bed: Bed, x = 0, y = 0): Part | null {
+export function makeOutlinePart(source: Shape, size: OutlineSize, height: number, bed: Bed, x = 0, y = 0, tag?: string): Part | null {
   const n = normalizeOutline(source);
   if (!n) return null;
   let s = 'scale' in size ? size.scale : size.longest / Math.max(n.w, n.d);
@@ -78,6 +85,7 @@ export function makeOutlinePart(source: Shape, size: OutlineSize, height: number
     d: round1(Math.max(MIN_SIZE, n.d * s)),
     h: round1(clamp(height, MIN_SIZE, Math.max(MIN_SIZE, bed.height))),
     rot: 0,
+    ...(tag ? { tag } : {}),
   };
 }
 
@@ -180,3 +188,15 @@ export function duplicatePart(p: Part, offset = 15): Part {
 
 /** Körper in die Mitte des Betts setzen (z bleibt). */
 export const centered = (p: Part): Part => ({ ...p, x: 0, y: 0 });
+
+// ---------- Sonderformen: Röhre und Zahnrad (Umriss mit Höhe) ----------
+/** Röhre (Außendurchmesser und Länge/Höhe in mm). */
+export function makeTubePart(bed: Bed, diameter = 24, height = 60, x = 0, y = 0): Part {
+  return makeOutlinePart(tubeShape(diameter), { scale: 1 }, height, bed, x, y, 'tube')!;
+}
+
+/** Zahnrad mit `teeth` Zähnen (siehe shapes3d.ts), Dicke `height` mm. */
+export function makeGearPart(teeth: number, height: number, bed: Bed, x = 0, y = 0): Part {
+  const t = Math.min(MAX_TEETH, Math.max(MIN_TEETH, Math.round(teeth)));
+  return { ...makeOutlinePart(gearShape(t), { scale: 1 }, height, bed, x, y, 'gear')!, teeth: t };
+}

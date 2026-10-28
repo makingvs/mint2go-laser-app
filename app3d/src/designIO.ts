@@ -14,14 +14,14 @@ export function createDesign(): Design {
 }
 
 /** Arbeit zum Speichern zusammenstellen (nur die Netze, die die Körper wirklich brauchen). */
-export function packDesign(base: Pick<Design, 'id' | 'created' | 'thumb'>, parts: Part[], now = Date.now()): Design {
+export function packDesign(base: Pick<Design, 'id' | 'created' | 'thumb' | 'guide'>, parts: Part[], now = Date.now()): Design {
   const meshes: Record<string, StoredMesh> = {};
   for (const p of parts) {
     if (p.kind !== 'mesh' || !p.meshId || meshes[p.meshId]) continue;
     const m = getMesh(p.meshId);
     if (m) meshes[p.meshId] = { pos: Float32Array.from(m.pos), idx: Uint32Array.from(m.idx) };
   }
-  return { id: base.id, created: base.created, updated: now, parts: cloneParts(parts), meshes, thumb: base.thumb };
+  return { id: base.id, created: base.created, updated: now, parts: cloneParts(parts), meshes, thumb: base.thumb, ...(base.guide ? { guide: base.guide } : {}) };
 }
 
 /** Gespeicherte Arbeit öffnen: Netze zurück in den Speicher, Körper liefern. */

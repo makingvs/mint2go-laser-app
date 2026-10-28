@@ -4,6 +4,7 @@
 import { safeName } from '../../src/names';
 import { DEFAULT_PRINTER, normalizePrinter, type PrinterSettings } from './bed';
 import type { Part } from './model3d';
+import type { GuideState } from './werkstatt/engine3d';
 
 export interface Profile {
   id: string;
@@ -35,6 +36,8 @@ export interface Design {
   meshes: Record<string, StoredMesh>;
   /** kleines Vorschaubild (JPEG als data-URL) für die Galerie */
   thumb?: string;
+  /** Fortschritt in der 3D-Werkstatt (nur bei Arbeiten, die aus einem Projekt entstanden sind) */
+  guide?: GuideState;
 }
 
 export type StoredDesign = Design & { profile: string };

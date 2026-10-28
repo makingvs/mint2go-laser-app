@@ -9,18 +9,21 @@ import { SHAPE_GROUPS, SHAPE_LABELS, baseShape, type ShapeId } from '../../src/s
 import { svgToShape } from '../../src/svgImport';
 import { GLYPH_HEIGHT, textShape } from '../../src/text';
 import { grayFromRGBA, traceGray } from '../../src/trace';
-import { ICONS3D, KIND_ICONS } from './icons3d';
+import { ICONS3D, KIND_ICONS, SPECIAL_ICONS } from './icons3d';
 import type { PrintCheck } from './printExport';
 import type { ExportFormat } from './storage3d';
 import { KIND_LABELS, PART_KINDS, type PartKind } from './mesh';
 
 // ---------- Körper ----------
-/** Auswahl der Grundkörper (Würfel, Kugel, ...); liefert die Art oder null. */
-export function openKindPicker(): Promise<PartKind | null> {
+/** Sonderkörper neben den Grundkörpern: Röhre und Zahnrad */
+export type SpecialKind = 'tube' | 'gear';
+
+/** Auswahl der Körper (Würfel, Kugel, ..., Röhre, Zahnrad); liefert die Art oder null. */
+export function openKindPicker(): Promise<PartKind | SpecialKind | null> {
   return new Promise((resolve) => {
     const o = overlay('overlay-dim');
     const panel = h('div', 'panel kind-panel');
-    const done = (v: PartKind | null) => {
+    const done = (v: PartKind | SpecialKind | null) => {
       o.close();
       resolve(v);
     };
@@ -28,6 +31,10 @@ export function openKindPicker(): Promise<PartKind | null> {
     head.append(button('btn', ICONS.cross, () => done(null), 'Schließen'));
     const grid = h('div', 'kind-grid');
     for (const k of PART_KINDS) grid.append(button('btn labeled tool', lab(KIND_ICONS[k], KIND_LABELS[k]), () => done(k), KIND_LABELS[k]));
+    grid.append(
+      button('btn labeled tool', lab(SPECIAL_ICONS.tube, 'Röhre'), () => done('tube'), 'Röhre'),
+      button('btn labeled tool', lab(SPECIAL_ICONS.gear, 'Zahnrad'), () => done('gear'), 'Zahnrad'),
+    );
     panel.append(head, grid);
     o.root.append(panel);
     o.root.addEventListener('click', (e) => {
