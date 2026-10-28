@@ -164,3 +164,10 @@ export function printCheck(parts: Part[], model: Pick<FinalModel, 'components'> 
   const thin = parts.some((p) => !p.hole && p.kind === 'extrude' && featureSize(scaledOutline(p)) < 4 * nozzle);
   return { empty: false, outside, floating, thin };
 }
+
+/**
+ * Dateityp, mit dem die Datei an das Teilen-Menü (iPad) übergeben wird. Bewusst `application/octet-stream`
+ * ("beliebige Daten") statt `model/stl`/`model/3mf`: iOS kennt diese Typen nicht und blendet dann Programme wie
+ * LocalSend aus, deren Teilen-Erweiterung nur bestimmte Inhalte annimmt. Der Dateiname behält die Endung (.stl/.3mf).
+ */
+export const shareMime = (_format: 'stl' | '3mf'): string => 'application/octet-stream';

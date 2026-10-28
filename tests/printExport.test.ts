@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { textShape } from '../src/text';
-import { bedCorner, buildFinal, printCheck, to3mf, toStl, type FinalModel } from '../app3d/src/printExport';
+import { bedCorner, buildFinal, printCheck, shareMime, to3mf, toStl, type FinalModel } from '../app3d/src/printExport';
 import { createPart, makeOutlinePart, type Part } from '../app3d/src/model3d';
 
 const bed = { width: 200, depth: 200, height: 100 };
@@ -146,5 +146,12 @@ describe('Druckprüfung', () => {
     expect(printCheck([strip(0.5)], { components: [comp(0)] }, bed, 0.4).thin).toBe(true); // 0,5 mm breit < 0,8 mm
     expect(printCheck([strip(5)], { components: [comp(0)] }, bed, 0.4).thin).toBe(false); // 5 mm breit
     expect(printCheck([{ ...strip(0.5), hole: true }], { components: [comp(0)] }, bed, 0.4).thin).toBe(false); // Löcher werden nicht gedruckt
+  });
+});
+
+describe('Teilen-Menü', () => {
+  it('STL und 3MF werden als allgemeine Daten übergeben (iOS kennt model/stl nicht und blendet sonst Programme wie LocalSend aus)', () => {
+    expect(shareMime('stl')).toBe('application/octet-stream');
+    expect(shareMime('3mf')).toBe('application/octet-stream');
   });
 });

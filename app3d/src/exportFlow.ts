@@ -7,7 +7,7 @@ import { openSaveDialog } from '../../src/saveDialog';
 import type { PrinterSettings } from './bed';
 import { notify, openExportPanel } from './dialogs3d';
 import type { Part } from './model3d';
-import { bedCorner, buildFinal, printCheck, to3mf, toStl } from './printExport';
+import { bedCorner, buildFinal, printCheck, shareMime, to3mf, toStl } from './printExport';
 import type { ExportFormat } from './storage3d';
 
 /** Sanduhr-Fenster während einer Berechnung; close() entfernt es wieder. */
@@ -33,7 +33,7 @@ export async function exportParts(parts: Part[], printer: PrinterSettings, forma
     ext: fmt,
     icon: ICONS.share,
     // direkt im Tipp auf ✓: nur so darf das Teilen-Menü (iPad) geöffnet werden
-    onSave: (name) => void saveFile(name, fmt === 'stl' ? toStl(model, shift) : to3mf(model, shift), fmt === 'stl' ? 'model/stl' : 'model/3mf'),
+    onSave: (name) => void saveFile(name, fmt === 'stl' ? toStl(model, shift) : to3mf(model, shift), shareMime(fmt)),
   });
   return fmt;
 }
