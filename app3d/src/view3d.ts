@@ -442,7 +442,8 @@ export class View3d {
     const [vx, vy] = kind === 'lift' ? liftHandleXY(p) : [p.x, p.y]; // senkrechte Linie, an der gezogen wird
     const gz = closestZOnVertical(ray.o, ray.d, vx, vy) ?? p.z + p.h;
     const start = { ...p };
-    const resting = kind === 'move' && Math.abs(p.z - supportHeight(start, this.others(p.id), start)) < 0.05;
+    // Löcher sind Schneidwerkzeuge: sie fallen nicht auf andere Körper, sondern bleiben, wo man sie hinsetzt
+    const resting = kind === 'move' && !p.hole && Math.abs(p.z - supportHeight(start, this.others(p.id), start)) < 0.05;
     this.drag = { kind, id: p.id, start, grab: g, grabZ: gz, resting, offset: [p.x - g[0], p.y - g[1]] };
   }
 

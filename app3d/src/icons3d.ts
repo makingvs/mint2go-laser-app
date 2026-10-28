@@ -1,4 +1,5 @@
 // Symbole der 3D-App (Inline-SVG wie in src/icons.ts; gemeinsame Symbole kommen von dort).
+import { gearPath } from '../../src/decor';
 import type { PartKind } from './mesh';
 
 const svg = (inner: string) =>
@@ -25,4 +26,15 @@ export const ICONS3D = {
   bed: svg('<path d="M3 17h18v3H3z"/><path d="M6 17V8h12v9"/><path d="M10 12h4"/>'),
   thin: svg('<path d="M3 12h6M21 12h-6M9 8l-3 4 3 4M15 8l3 4-3 4"/>'),
   home: svg('<path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>'),
+  tilt: svg('<path d="M7 17 5 9l8-2 2 8z" fill="currentColor" fill-opacity=".14"/><path d="M4 20h16"/>'),
+  mirror: svg('<path d="M12 3v18" stroke-dasharray="2.5 2.5"/><path d="M9 7 4 17h5zM15 7l5 10h-5z" fill="currentColor" fill-opacity=".14"/>'),
+  align: svg('<path d="M12 3v18"/><rect x="4.5" y="6" width="15" height="4" rx="1"/><rect x="8" y="14" width="8" height="4" rx="1"/>'),
+  speaker: svg('<path d="M4 9v6h4l5 4V5L8 9z" fill="currentColor" fill-opacity=".14"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a8 8 0 0 1 0 11"/>'),
+  lamp: svg('<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>'),
+};
+
+/** Sonderkörper in der Körper-Auswahl: Röhre und Zahnrad */
+export const SPECIAL_ICONS = {
+  tube: svg('<ellipse cx="12" cy="6" rx="7" ry="3" fill="currentColor" fill-opacity=".14"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><ellipse cx="12" cy="6" rx="3.5" ry="1.4"/>'),
+  gear: svg(`<path d="${gearPath(12, 12, 9.5, 9, 0.3)}" fill="currentColor" fill-opacity=".14" fill-rule="evenodd"/>`),
 };

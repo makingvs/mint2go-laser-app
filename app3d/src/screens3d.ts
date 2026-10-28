@@ -10,6 +10,7 @@ import { exportParts } from './exportFlow';
 import { KIND_ICONS } from './icons3d';
 import { openLicenses } from './licenses3d';
 import { openTeacher } from './teacher3d';
+import { projectByNumber } from './werkstatt/projects3d';
 import { storage, type Design, type Profile, type Settings } from './storage3d';
 
 function errorBox(retry: () => void): HTMLElement {
@@ -106,6 +107,7 @@ export function galleryScreen(
   settings: Settings,
   onBack: () => void,
   onOpen: (d: Design | null) => void,
+  onWerkstatt?: () => void,
 ): void {
   root.innerHTML = '';
   const screen = h('div', 'screen gallery-screen');
@@ -141,6 +143,7 @@ export function galleryScreen(
       const list = await storage.listDesigns(profile.id);
       grid.innerHTML = '';
       grid.append(button('card add-card wide', ICONS.plus, () => onOpen(null), 'Neu'));
+      if (onWerkstatt) grid.append(button('card werk-entry wide', '<span class="emoji">🛠️</span><span class="cap">3D-Werkstatt</span>', onWerkstatt, '3D-Werkstatt'));
       for (const d of list) {
         const card = h('div', 'card work-card');
         const thumb = d.thumb ? `<img class="thumb" src="${d.thumb}" alt="" draggable="false">` : `<span class="thumb thumb-empty">${KIND_ICONS.box}</span>`;
@@ -158,6 +161,7 @@ export function galleryScreen(
           if (!d.parts.length) return shake(exp);
           await exportParts(unpackDesign(d), settings, settings.format);
         }, 'Exportieren');
+        if (d.guide) card.append(h('div', 'work-badge' + (d.guide.done ? ' done' : ''), `${d.guide.done ? '⭐' : '🛠️'} ${projectByNumber(d.guide.project)?.emoji ?? d.guide.project}`));
         const actions = h('div', 'work-actions');
         actions.append(exp, del);
         card.append(open, actions);
