@@ -180,6 +180,18 @@ Rechts unter den Werkzeugen: **＋** vergrößert, **－** verkleinert (stufenwe
 
 Teil antippen, dann oben die Taste **Sperre**. Ein gesperrtes Teil lässt sich nicht mehr verschieben, skalieren, drehen, in der Art ändern (Schneiden/Gravieren/Füllen), nicht löschen und nicht in der Schrift ändern; die Maße-Leiste ist grau. Es trägt ein kleines Schloss und eine gestrichelte Umrandung, ohne Griffe. Tippen darauf lässt die Taste kurz wackeln. Dieselbe Taste (jetzt **Frei**) entsperrt wieder. Die Sperre wird mit der Arbeit gespeichert und ist Teil von Rückgängig; eine Kopie ist nicht gesperrt.
 
+## Box-Generator
+
+In der Galerie die grüne Karte **Box-Generator**: Maße (Breite, Tiefe, Höhe, wahlweise **innen** oder **außen** gemessen) und **Deckel** (offen / lose aufgelegt / fest mit Zinken) einstellen, ✓ → die Teile liegen fertig auf einer neuen Arbeitsfläche (Plattengröße = Anordnung der Teile), alle als **Schneiden** (rot) und **gesperrt**, damit die Passung nicht versehentlich verzogen wird (Sperre aufheben, dann kann man z. B. Text/Gravur ergänzen). Die Vorschau zeigt die Anordnung; Warnung, falls sie nicht auf die S1-Fläche (498 × 319 mm) passt. Der Export ist die normale SVG (ein roter Pfad „schneiden“).
+
+**Zinken**: Alle Kanten greifen mit Fingerzinken ineinander (ungerade Anzahl, gleich breit; gewünschte Breite ca. 10 mm). **Schnittbreite des Lasers (Kerf)**: Der Strahl nimmt etwa 0,1–0,2 mm Holz weg. Alle Umrisse werden deshalb um (Schnittbreite − Passung) / 2 nach außen versetzt: Zinken werden entsprechend breiter gezeichnet, Lücken schmaler, nach dem Schneiden passen sie. Unter **🔧 Profi** stehen Material (Dicke **nachmessen**, 3-mm-Sperrholz ist oft 2,8–3,2 mm), Zinkenbreite, **Schnittbreite** (Startwert 0,15 mm), **Passung** (größer = lockerer, kleiner = strammer; Startwert 0,05 mm). Die Werte werden auf dem Gerät gemerkt.
+
+**Passprobe** (🧪): schneidet 5 kleine Zinken-Paare mit den Schnittbreiten 0,05 / 0,10 / 0,15 / 0,20 / 0,25 mm (die Zahl daneben in Hundertstel-mm). Das Paar, das fest und ohne Gewalt hält, bestimmt den Wert für das Feld Schnittbreite. Für den xTool S1 40 W auf Pappelsperrholz 3 mm gibt es keinen veröffentlichten Wert; 0,15 mm ist ein Startwert für Diodenlaser und **nicht nachgemessen**. Laser-Werte zum Schneiden (Pappelsperrholz 3 mm): siehe Laser-Werkstatt, Projekt 1 (100 %, 15 mm/s).
+
+## Fangen
+
+Links die Taste **Fangen** (orange Gruppe, Magnet). Ist sie an (blau hinterlegt), **rastet** ein Teil beim Verschieben an **Kanten und Mitten** anderer Teile und an **Rand und Mitte der Zeichenfläche** ein. Der Fangabstand beträgt etwa 9 Bildschirmpixel (bleibt beim Zoomen gleich fühlbar); beim Einrasten erscheint eine **rosa gestrichelte Führungslinie**, die nach dem Loslassen verschwindet. Ein Tipp auf Fangen schaltet aus (frei verschieben); die Einstellung wird auf dem Gerät gemerkt, Standard: an. Gefangen wird nur beim Verschieben (nicht beim Skalieren/Drehen). Logik: `src/snap.ts`.
+
 ## Hand: Zoomen und Verschieben mit Gesten
 
 Rechts in der Zoom-Leiste: Taste **Hand**. Danach (Auswahlgriffe sind ausgeblendet, es wird nichts versehentlich verändert): **ein Finger** (oder Maus) zieht die Arbeitsfläche, **zwei Finger** zoomen unter den Fingern (bis 800 %) und verschieben gleichzeitig, am PC zoomt das **Mausrad** unter dem Zeiger. Ein Tipp auf Hand schaltet zurück; auch das Wählen eines anderen Werkzeugs (Formen, Freihand, neues Teil) beendet den Hand-Modus. Die Tasten ＋/－/Alles gelten weiter.

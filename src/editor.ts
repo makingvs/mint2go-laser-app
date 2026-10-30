@@ -15,6 +15,7 @@ import { History, isTooThin, makeElement, newId, normalizeBase, pickElement, typ
 import { canvasBackground, elementMarkup } from './render';
 import { MAX_ZOOM, anchoredCenter, defaultSurface, isFree, isOutside, rectSurface, surfaceKey, surfaceSize, viewFor, zoomedView, type View } from './surface';
 import { openSurfaceDialog } from './surfaceDialog';
+import { snapMove, snapTolerance, type Box, type Guide } from './snap';
 import { SHAPE_GROUPS, SHAPE_LABELS, baseShape, type ShapeId } from './shapes';
 import { GLYPH_HEIGHT, textShape } from './text';
 import { FONTS, fontStyle, fontTextShape, textInfo, type FontChoice } from './fonts';
@@ -33,7 +34,7 @@ export interface EditorOpts {
 }
 
 type Gesture =
-  | { t: 'move'; id: string; start: Pt; ox: number; oy: number }
+  | { t: 'move'; id: string; start: Pt; ox: number; oy: number; b0: Box; targets: Box[] }
   | { t: 'scale'; id: string; c: Pt; d0: number; w0: number; h0: number; rot: number; lx0: number; ly0: number }
   | { t: 'rotate'; id: string; c: Pt; a0: number; rot0: number }
   | { t: 'pinch'; id: string; d0: number; a0: number; m0: Pt; w0: number; h0: number; rot0: number; x0: number; y0: number }
@@ -55,6 +56,15 @@ export class Editor {
   private drawMode = false;
   /** Hand-Werkzeug: Ziehen verschiebt, zwei Finger zoomen die Arbeitsfläche */
   private handMode = false;
+  /** Fangen: beim Verschieben an Kanten/Mitten anderer Teile und der Fläche einrasten */
+  private snapOn = (() => {
+    try {
+      return localStorage.getItem('laser.snap') !== '0';
+    } catch {
+      return true;
+    }
+  })();
+  private guides: Guide[] = [];
   private clientPts = new Map<number, Pt>();
   private gesture: Gesture | null = null;
   private pointers = new Map<number, Pt>();
@@ -98,6 +108,8 @@ export class Editor {
     document.addEventListener('visibilitychange', this.onHide);
     window.addEventListener('pagehide', this.onHide);
     requestAnimationFrame(() => this.render());
+    // fertig vorbereitete Arbeit (z. B. Box-Generator): gleich speichern
+    if (!o.saved && o.design.elements.length) this.scheduleSave();
   }
 
   private get els(): El[] {
@@ -202,6 +214,7 @@ export class Editor {
       group('var(--m-green)', this.btn.shapes, this.btn.draw),
       group('var(--m-blue)', this.btn.image, this.btn.svgfile, this.btn.search),
       group('var(--m-pink)', (this.btn.text = button('btn labeled tool', lab(ICONS.text, 'Text'), () => this.openText(), 'Text'))),
+      group('var(--m-orange)', (this.btn.snap = button('btn labeled tool', lab(ICONS.magnet, 'Fangen'), () => this.toggleSnap(), 'Fangen: Teile rasten ein'))),
     );
 
     this.stage = h('div', 'stage');
@@ -419,6 +432,25 @@ export class Editor {
     this.commit();
   }
 
+  /** Fangen ein/aus (wird auf dem Gerät gemerkt). */
+  private toggleSnap(): void {
+    this.snapOn = !this.snapOn;
+    this.guides = [];
+    try {
+      localStorage.setItem('laser.snap', this.snapOn ? '1' : '0');
+    } catch {
+      /* ignorieren */
+    }
+    this.render();
+  }
+
+  /** Rahmen des Teils und Fangziele (andere Teile + Zeichenfläche) für das Verschieben. */
+  private snapTargets(el: El): { b0: Box; targets: Box[] } {
+    const targets: Box[] = this.els.filter((o) => o.id !== el.id).map((o) => bbox(worldShape(o)));
+    if (!isFree(this.surface)) targets.push({ minX: 0, maxX: this.surface.w, minY: 0, maxY: this.surface.h });
+    return { b0: bbox(worldShape(el)), targets };
+  }
+
   /** Hand-Werkzeug ein/aus. */
   private toggleHand(): void {
     this.handMode = !this.handMode;
@@ -571,6 +603,10 @@ export class Editor {
       if (!this.thin(e)) continue;
       out += `<g transform="translate(${b.maxX + 2 * k} ${b.minY - 2 * k}) scale(${k})"><path d="M0 -14 13 10H-13Z" fill="#ffb300" stroke="#7a4b00" stroke-width="2" stroke-linejoin="round"/><path d="M0 -5v8M0 6.500v.5" stroke="#7a4b00" stroke-width="2.600" stroke-linecap="round"/></g>`;
     }
+    for (const gd of this.guides) {
+      const [x1, y1, x2, y2] = gd.axis === 'x' ? [gd.pos, gd.a, gd.pos, gd.b] : [gd.a, gd.pos, gd.b, gd.pos];
+      out += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#e01070" stroke-width="1.6" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>`;
+    }
     if (sel && !this.drawMode && !this.handMode) out += this.selectionMarkup(sel, k);
     const g = this.gesture;
     if (g && g.t === 'draw' && g.pts.length > 1) {
@@ -622,6 +658,7 @@ export class Editor {
     this.btn.lock.innerHTML = lab(frozen ? ICONS.objUnlock : ICONS.objLock, frozen ? 'Frei' : 'Sperre');
     this.btn.lock.setAttribute('aria-label', frozen ? 'Objekt entsperren' : 'Objekt sperren');
     this.btn.hand.classList.toggle('active', this.handMode);
+    this.btn.snap.classList.toggle('active', this.snapOn);
     this.svg.classList.toggle('hand', this.handMode);
     for (const o of ['cut', 'engrave', 'fill']) this.btn[`op-${o}`].disabled = frozen;
     this.btn.draw.classList.toggle('active', this.drawMode);
@@ -712,7 +749,7 @@ export class Editor {
         // gesperrt: nichts verändern
         this.gesture = { t: 'frozen' };
         this.flash(this.btn.lock);
-      } else this.gesture = { t: 'move', id: hit.id, start: p, ox: hit.x, oy: hit.y };
+      } else this.gesture = { t: 'move', id: hit.id, start: p, ox: hit.x, oy: hit.y, ...this.snapTargets(hit) };
     } else {
       this.selectedId = null;
       this.gesture = null;
@@ -762,8 +799,20 @@ export class Editor {
       el.h = h0 * nf;
     };
     if (g.t === 'move') {
-      el.x = clampX(g.ox + p[0] - g.start[0]);
-      el.y = clampY(g.oy + p[1] - g.start[1]);
+      let nx = g.ox + p[0] - g.start[0];
+      let ny = g.oy + p[1] - g.start[1];
+      this.guides = [];
+      if (this.snapOn && dist(p, g.start) > 0.5) {
+        const dx = nx - g.ox;
+        const dy = ny - g.oy;
+        const moved: Box = { minX: g.b0.minX + dx, maxX: g.b0.maxX + dx, minY: g.b0.minY + dy, maxY: g.b0.maxY + dy };
+        const r = snapMove(moved, g.targets, snapTolerance(this.k()));
+        nx += r.dx;
+        ny += r.dy;
+        this.guides = r.guides;
+      }
+      el.x = clampX(nx);
+      el.y = clampY(ny);
       this.changed = this.changed || dist(p, g.start) > 0.5;
     } else if (g.t === 'scale') {
       if (this.lockAspect) {
@@ -821,6 +870,7 @@ export class Editor {
       this.gesture = null;
     }
     if (this.pointers.size === 0) {
+      this.guides = [];
       if (this.changed) this.commit();
       this.changed = false;
       this.requestRender();

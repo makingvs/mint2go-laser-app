@@ -39,6 +39,7 @@ export const ICONS = {
   objLock: svg('<rect x="3" y="3" width="12" height="12" rx="2.500"/><rect x="11" y="13" width="10" height="8" rx="2" fill="#fff"/><path d="M13.500 13v-1.500a2.500 2.500 0 0 1 5 0V13"/>'),
   objUnlock: svg('<rect x="3" y="3" width="12" height="12" rx="2.500"/><rect x="11" y="13" width="10" height="8" rx="2" fill="#fff"/><path d="M13.500 13v-1.500a2.500 2.500 0 0 1 4.800-1"/>'),
   hand: svg('<path d="M8 13V5.500a1.500 1.500 0 0 1 3 0V11"/><path d="M11 10V4a1.500 1.500 0 0 1 3 0v6"/><path d="M14 10V5.500a1.500 1.500 0 0 1 3 0V12"/><path d="M17 11.500a1.500 1.500 0 0 1 3 0V15a6 6 0 0 1-6 6h-1.500a6 6 0 0 1-4.600-2.100L5 15.500a1.500 1.500 0 0 1 2.300-1.900L8 14.500"/>'),
+  magnet: svg('<path d="M5 3v9a7 7 0 0 0 14 0V3"/><path d="M5 7h4M15 7h4"/>'),
   center: svg('<circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>'),
   check: svg('<path d="m4 12 6 6L20 6"/>'),
   cross: svg('<path d="M6 6l12 12M18 6 6 18"/>'),

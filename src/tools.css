@@ -25,5 +25,7 @@
   :root {
     --op-h: 90px;
     --zoom-h: 58px;
+    --lb-h: 64px;
+    --ico: 30px;
   }
 }

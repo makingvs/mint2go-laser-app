@@ -110,6 +110,7 @@ export function galleryScreen(
   onBack: () => void,
   onOpen: (d: Design | null) => void,
   onWerkstatt?: () => void,
+  onBox?: () => void,
 ): void {
   root.innerHTML = '';
   const screen = h('div', 'screen gallery-screen');
@@ -146,6 +147,7 @@ export function galleryScreen(
       const list = await storage.listDesigns(profile.id);
       grid.innerHTML = '';
       grid.append(button('card add-card wide', ICONS.plus, () => onOpen(null), 'Neu'));
+      if (onBox) grid.append(button('card box-entry wide', '<span class="emoji">📦</span><span class="cap">Box-Generator</span>', onBox, 'Box-Generator'));
       if (onWerkstatt) grid.append(button('card werk-entry wide', '<span class="emoji">🛠️</span><span class="cap">Laser-Werkstatt</span>', onWerkstatt, 'Laser-Werkstatt'));
       for (const d of list) {
         const card = h('div', 'card work-card');

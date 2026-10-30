@@ -1,12 +1,14 @@
 import './style.css';
 import './guided/guided.css';
 import './tools.css';
+import './box.css';
 import { Editor } from './editor';
 import { DEFAULT_SETTINGS, createDesign, type Design, type Settings, type Surface } from './model';
 import type { GuideState, Project } from './guided/engine';
 import { werkstattScreen } from './guided/werkstatt';
 import { defaultSurface, ellipseSurface, rectSurface } from './surface';
 import { openSurfaceDialog } from './surfaceDialog';
+import { openBoxDialog } from './boxDialog';
 import { galleryScreen, profileScreen } from './screens';
 import { storage, type Profile } from './storage';
 
@@ -45,7 +47,7 @@ async function showGallery(profile: Profile): Promise<void> {
     if (d) openEditor(profile, d);
     // Neue Arbeit: zuerst die Zeichenfläche wählen (unendlich oder Werkstück mit Maßen)
     else openSurfaceDialog({ settings, onDone: (surface) => openEditor(profile, null, surface) });
-  }, () => void showWerkstatt(profile));
+  }, () => void showWerkstatt(profile), () => openBoxDialog({ settings, onDone: (r) => openEditor(profile, null, r.surface, undefined, r.elements) }));
 }
 
 /** Laser-Werkstatt: geführte Projekte */
@@ -68,9 +70,9 @@ function startGuided(profile: Profile, p: Project, existing: Design | null): voi
   openEditor(profile, null, surface, { project: p.n, step: 0 });
 }
 
-function openEditor(profile: Profile, existing: Design | null, surface?: Surface, guide?: GuideState): void {
+function openEditor(profile: Profile, existing: Design | null, surface?: Surface, guide?: GuideState, elements?: Design['elements']): void {
   app.innerHTML = '';
-  const design = existing ?? { ...createDesign(), surface, guide };
+  const design = existing ?? { ...createDesign(), surface, guide, ...(elements ? { elements } : {}) };
   editor = new Editor({
     profile,
     design,
