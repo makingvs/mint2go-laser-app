@@ -176,6 +176,14 @@ Beim Anlegen eines neuen Benutzers sind **Tier-Symbole, die schon vergeben sind,
 
 Rechts unter den Werkzeugen: **＋** vergrößert, **－** verkleinert (stufenweise ×1,5, bis 800 %), die Taste mit dem Rahmen zeigt wieder die **ganze Arbeitsfläche**. Die Prozentzahl steht darunter. Die Maße in mm ändern sich dabei nicht – nur der Ausschnitt. Im vergrößerten Zustand lässt sich der Ausschnitt verschieben, indem man auf eine **leere Stelle** der Fläche tippt und zieht. Ein ausgewähltes Teil wird beim Vergrößern in die Mitte genommen. Zwei Finger auf der Fläche zoomen nicht, sondern skalieren/drehen wie bisher das ausgewählte Teil.
 
+## Objekt sperren
+
+Teil antippen, dann oben die Taste **Sperre**. Ein gesperrtes Teil lässt sich nicht mehr verschieben, skalieren, drehen, in der Art ändern (Schneiden/Gravieren/Füllen), nicht löschen und nicht in der Schrift ändern; die Maße-Leiste ist grau. Es trägt ein kleines Schloss und eine gestrichelte Umrandung, ohne Griffe. Tippen darauf lässt die Taste kurz wackeln. Dieselbe Taste (jetzt **Frei**) entsperrt wieder. Die Sperre wird mit der Arbeit gespeichert und ist Teil von Rückgängig; eine Kopie ist nicht gesperrt.
+
+## Hand: Zoomen und Verschieben mit Gesten
+
+Rechts in der Zoom-Leiste: Taste **Hand**. Danach (Auswahlgriffe sind ausgeblendet, es wird nichts versehentlich verändert): **ein Finger** (oder Maus) zieht die Arbeitsfläche, **zwei Finger** zoomen unter den Fingern (bis 800 %) und verschieben gleichzeitig, am PC zoomt das **Mausrad** unter dem Zeiger. Ein Tipp auf Hand schaltet zurück; auch das Wählen eines anderen Werkzeugs (Formen, Freihand, neues Teil) beendet den Hand-Modus. Die Tasten ＋/－/Alles gelten weiter.
+
 ## Geführter Modus: Laser-Werkstatt
 
 In der Galerie führt die orange Karte **Laser-Werkstatt** zu den **20 Projekten** der MINT2Go Laser-Werkstatt (4 Stufen: Starter, Gravur-Profi, Schneide-Meister, Erfinder). Die Zeichnungen entstehen **direkt in dieser App** (nicht im xTool Studio). Ein Projekt wählen → „Los geht’s“ → im Editor erscheint oben über der Fläche die **Coach-Leiste**:

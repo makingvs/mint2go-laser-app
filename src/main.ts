@@ -1,5 +1,6 @@
 import './style.css';
 import './guided/guided.css';
+import './tools.css';
 import { Editor } from './editor';
 import { DEFAULT_SETTINGS, createDesign, type Design, type Settings, type Surface } from './model';
 import type { GuideState, Project } from './guided/engine';

@@ -13,7 +13,7 @@ import { bbox, dist, resample, shapeToPath, simplify, smooth, transformPoint, ty
 import { ICONS, SHAPE_ICONS } from './icons';
 import { History, isTooThin, makeElement, newId, normalizeBase, pickElement, type Design, type El, type Op, type Settings, type Surface, worldShape } from './model';
 import { canvasBackground, elementMarkup } from './render';
-import { MAX_ZOOM, defaultSurface, isFree, isOutside, rectSurface, surfaceKey, surfaceSize, viewFor, zoomedView, type View } from './surface';
+import { MAX_ZOOM, anchoredCenter, defaultSurface, isFree, isOutside, rectSurface, surfaceKey, surfaceSize, viewFor, zoomedView, type View } from './surface';
 import { openSurfaceDialog } from './surfaceDialog';
 import { SHAPE_GROUPS, SHAPE_LABELS, baseShape, type ShapeId } from './shapes';
 import { GLYPH_HEIGHT, textShape } from './text';
@@ -38,7 +38,9 @@ type Gesture =
   | { t: 'rotate'; id: string; c: Pt; a0: number; rot0: number }
   | { t: 'pinch'; id: string; d0: number; a0: number; m0: Pt; w0: number; h0: number; rot0: number; x0: number; y0: number }
   | { t: 'draw'; pts: Pt[] }
-  | { t: 'pan'; sx: number; sy: number; c0: Pt; k0: number };
+  | { t: 'pan'; sx: number; sy: number; c0: Pt; k0: number }
+  | { t: 'hzoom'; d0: number; z0: number; w0: Pt; kFit: number }
+  | { t: 'frozen' };
 
 const OP_ICON: Record<Op, string> = { cut: ICONS.scissors, engrave: ICONS.pen, fill: ICONS.roller };
 const OP_LABEL: Record<Op, string> = { cut: 'Schneiden', engrave: 'Gravieren', fill: 'Fläche gravieren' };
@@ -51,6 +53,9 @@ export class Editor {
   private selectedId: string | null = null;
   private currentOp: Op = 'cut';
   private drawMode = false;
+  /** Hand-Werkzeug: Ziehen verschiebt, zwei Finger zoomen die Arbeitsfläche */
+  private handMode = false;
+  private clientPts = new Map<number, Pt>();
   private gesture: Gesture | null = null;
   private pointers = new Map<number, Pt>();
   private changed = false;
@@ -154,7 +159,8 @@ export class Editor {
     this.btn.del = button('btn labeled danger', lab(ICONS.trash, 'Löschen'), () => void this.remove(), 'Löschen');
     this.btn.export = button('btn labeled send', lab(ICONS.download, 'Export'), () => void this.exportNow(), 'Exportieren');
     this.btn.font = button('btn labeled', lab(ICONS.text, 'Schrift'), () => this.editText(), 'Schrift ändern');
-    right.append(this.btn.font, this.btn.dup, this.btn.del, this.btn.export);
+    this.btn.lock = button('btn labeled', lab(ICONS.objLock, 'Sperre'), () => this.toggleLock(), 'Objekt sperren');
+    right.append(this.btn.font, this.btn.lock, this.btn.dup, this.btn.del, this.btn.export);
     top.append(left, center, right, h('div', 'cd-wrap top-line', cdLineMarkup()));
 
     const body = h('div', 'editor-body');
@@ -208,6 +214,7 @@ export class Editor {
     this.svg.addEventListener('pointermove', (e) => this.pointerMove(e));
     this.svg.addEventListener('pointerup', (e) => this.pointerUp(e));
     this.svg.addEventListener('pointercancel', (e) => this.pointerUp(e));
+    this.svg.addEventListener('wheel', (e) => this.wheel(e), { passive: false });
 
     const opRail = h('div', 'rail right-rail');
     for (const op of ['cut', 'engrave', 'fill'] as Op[]) {
@@ -220,7 +227,8 @@ export class Editor {
     this.btn.zoomOut = button('btn labeled zoom', lab(ICONS.minus, 'Kleiner'), () => this.zoomBy(1 / 1.5), 'Verkleinern');
     this.btn.zoomFit = button('btn labeled zoom', lab(ICONS.fit, 'Alles'), () => this.zoomFit(), 'Ganze Fläche');
     this.zoomLabel = h('div', 'zoom-label');
-    zoomBox.append(this.btn.zoomIn, this.btn.zoomOut, this.btn.zoomFit, this.zoomLabel);
+    this.btn.hand = button('btn labeled zoom hand', lab(ICONS.hand, 'Hand'), () => this.toggleHand(), 'Hand: Fläche zoomen und verschieben');
+    zoomBox.append(this.btn.hand, this.btn.zoomIn, this.btn.zoomOut, this.btn.zoomFit, this.zoomLabel);
     opRail.append(zoomBox);
     body.append(rail, this.stage, opRail);
     this.root.append(top, body);
@@ -321,7 +329,7 @@ export class Editor {
    */
   private centerSelected(): void {
     const e = this.selected;
-    if (!e) return;
+    if (!e || e.locked) return;
     let target: Pt | null = null;
     let best = Infinity;
     for (const o of this.els) {
@@ -343,7 +351,7 @@ export class Editor {
 
   private updateDims(): void {
     const sel = this.selected;
-    this.dims.classList.toggle('off', !sel);
+    this.dims.classList.toggle('off', !sel || !!sel.locked);
     this.dimVal.w.textContent = sel ? formatNumber(sel.w) : '–';
     this.dimVal.h.textContent = sel ? formatNumber(sel.h) : '–';
     this.dimVal.rot.textContent = sel ? formatNumber(((sel.rot % 360) + 360) % 360) : '–';
@@ -352,7 +360,7 @@ export class Editor {
   /** Maß per Zahlentastatur ändern. */
   private async editDim(kind: 'w' | 'h' | 'rot'): Promise<void> {
     const el = this.selected;
-    if (!el) return;
+    if (!el || el.locked) return;
     const area = surfaceSize(this.surface);
     const maxSize = Math.max(area.w, area.h) * 3;
     const value = kind === 'rot' ? ((el.rot % 360) + 360) % 360 : el[kind];
@@ -400,6 +408,63 @@ export class Editor {
       this.zoomCenter = c;
       this.render();
     }
+  }
+
+  /** Objekt sperren/entsperren (gesperrt: Größe, Lage, Drehung, Art und Löschen gesperrt). */
+  private toggleLock(): void {
+    const sel = this.selected;
+    if (!sel) return;
+    if (sel.locked) delete sel.locked;
+    else sel.locked = true;
+    this.commit();
+  }
+
+  /** Hand-Werkzeug ein/aus. */
+  private toggleHand(): void {
+    this.handMode = !this.handMode;
+    if (this.handMode) {
+      this.drawMode = false;
+      this.gesture = null;
+    }
+    this.render();
+  }
+
+  /** Ein Finger/Maus: Fläche verschieben; zwei Finger: zoomen und verschieben. */
+  private startHandGesture(): void {
+    const pts = [...this.clientPts.values()];
+    const kFit = this.k() * this.zoom;
+    if (pts.length >= 2) {
+      const [a, b] = pts;
+      const mid: Pt = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      this.gesture = { t: 'hzoom', d0: Math.max(dist(a, b), 1), z0: this.zoom, w0: this.toMM({ clientX: mid[0], clientY: mid[1] }), kFit };
+    } else if (pts.length === 1) {
+      const v = this.effView();
+      this.gesture = { t: 'pan', sx: pts[0][0], sy: pts[0][1], c0: this.zoomCenter ?? [v.x + v.w / 2, v.y + v.h / 2], k0: this.k() };
+    }
+  }
+
+  /** Zoom so setzen, dass der Punkt w (mm) unter dem Bildschirmpunkt `at` bleibt. kFit = mm pro Pixel bei Zoom 1. */
+  private zoomAround(at: Pt, w: Pt, zoom: number, kFit: number): void {
+    const z = Math.min(MAX_ZOOM, Math.max(1, zoom));
+    if (z < 1.02) {
+      this.zoom = 1;
+      this.zoomCenter = null;
+    } else {
+      const r = this.svg.getBoundingClientRect();
+      this.zoom = z;
+      this.zoomCenter = anchoredCenter(w, at, [r.left + r.width / 2, r.top + r.height / 2], kFit, z);
+    }
+    this.setViewBox();
+    this.requestRender();
+  }
+
+  /** Mausrad im Hand-Modus: zoomen unter dem Zeiger. */
+  private wheel(ev: WheelEvent): void {
+    if (!this.handMode) return;
+    ev.preventDefault();
+    const kFit = this.k() * this.zoom;
+    const w = this.toMM(ev);
+    this.zoomAround([ev.clientX, ev.clientY], w, this.zoom * Math.exp(-ev.deltaY * 0.0015), kFit);
   }
 
   /** Wieder die ganze Arbeitsfläche zeigen. */
@@ -497,13 +562,16 @@ export class Editor {
     const sel = this.selected;
     for (const e of this.els) {
       const b = bbox(worldShape(e));
+      if (e.locked) {
+        out += `<g transform="translate(${b.maxX} ${b.maxY}) scale(${k})"><circle r="12" fill="#fff" stroke="#4d597c" stroke-width="2.5"/><g transform="translate(-7 -7.5) scale(0.58)" fill="none" stroke="#4d597c" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></g></g>`;
+      }
       if (this.outside(e)) {
         out += `<g transform="translate(${b.minX - 2 * k} ${b.minY - 2 * k}) scale(${k})"><path d="M0 -14 13 10H-13Z" fill="#ff5252" stroke="#7a1010" stroke-width="2" stroke-linejoin="round"/><path d="M0 -5v8M0 6.5v.5" stroke="#fff" stroke-width="2.6" stroke-linecap="round"/></g>`;
       }
       if (!this.thin(e)) continue;
       out += `<g transform="translate(${b.maxX + 2 * k} ${b.minY - 2 * k}) scale(${k})"><path d="M0 -14 13 10H-13Z" fill="#ffb300" stroke="#7a4b00" stroke-width="2" stroke-linejoin="round"/><path d="M0 -5v8M0 6.500v.5" stroke="#7a4b00" stroke-width="2.600" stroke-linecap="round"/></g>`;
     }
-    if (sel && !this.drawMode) out += this.selectionMarkup(sel, k);
+    if (sel && !this.drawMode && !this.handMode) out += this.selectionMarkup(sel, k);
     const g = this.gesture;
     if (g && g.t === 'draw' && g.pts.length > 1) {
       out += `<path d="M${g.pts.map((p) => `${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join('L')}" fill="none" stroke="${this.settings.colors[this.currentOp]}" stroke-width="3" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -527,6 +595,10 @@ export class Editor {
 
   private selectionMarkup(e: El, k: number): string {
     const hd = this.handles(e, k);
+    if (e.locked) {
+      const pts = hd.corners.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(' ');
+      return `<polygon points="${pts}" fill="none" stroke="#8993ad" stroke-width="2.5" stroke-dasharray="3 5" vector-effect="non-scaling-stroke"/>`;
+    }
     const poly = hd.corners.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(' ');
     let s = `<polygon points="${poly}" fill="none" stroke="#3757a9" stroke-width="2.5" stroke-dasharray="7 5" vector-effect="non-scaling-stroke"/>`;
     s += `<line x1="${hd.top[0]}" y1="${hd.top[1]}" x2="${hd.rotate[0]}" y2="${hd.rotate[1]}" stroke="#3757a9" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
@@ -541,9 +613,17 @@ export class Editor {
     const sel = this.selected;
     this.btn.undo.disabled = !this.history.canUndo;
     this.btn.redo.disabled = !this.history.canRedo;
+    const frozen = !!sel?.locked;
     this.btn.dup.disabled = !sel;
-    this.btn.font.disabled = !sel || sel.kind !== 'text';
-    this.btn.del.disabled = !sel;
+    this.btn.font.disabled = !sel || sel.kind !== 'text' || frozen;
+    this.btn.del.disabled = !sel || frozen;
+    this.btn.lock.disabled = !sel;
+    this.btn.lock.classList.toggle('active', frozen);
+    this.btn.lock.innerHTML = lab(frozen ? ICONS.objUnlock : ICONS.objLock, frozen ? 'Frei' : 'Sperre');
+    this.btn.lock.setAttribute('aria-label', frozen ? 'Objekt entsperren' : 'Objekt sperren');
+    this.btn.hand.classList.toggle('active', this.handMode);
+    this.svg.classList.toggle('hand', this.handMode);
+    for (const o of ['cut', 'engrave', 'fill']) this.btn[`op-${o}`].disabled = frozen;
     this.btn.draw.classList.toggle('active', this.drawMode);
     this.btn.zoomIn.disabled = this.zoom >= MAX_ZOOM - 0.01;
     this.btn.zoomOut.disabled = this.zoom <= 1.01;
@@ -556,7 +636,7 @@ export class Editor {
   }
 
   // ---------- Zeigerereignisse ----------
-  private toMM(ev: PointerEvent): Pt {
+  private toMM(ev: { clientX: number; clientY: number }): Pt {
     const m = this.svg.getScreenCTM();
     if (!m) return [0, 0];
     const pt = this.svg.createSVGPoint();
@@ -575,10 +655,15 @@ export class Editor {
     }
     const p = this.toMM(ev);
     this.pointers.set(ev.pointerId, p);
+    this.clientPts.set(ev.pointerId, [ev.clientX, ev.clientY]);
+    if (this.handMode) {
+      this.startHandGesture();
+      return;
+    }
     const k = this.k();
     const sel = this.selected;
 
-    if (this.pointers.size === 2 && sel && !this.drawMode) {
+    if (this.pointers.size === 2 && sel && !sel.locked && !this.drawMode) {
       const [a, b] = [...this.pointers.values()];
       this.gesture = {
         t: 'pinch',
@@ -601,7 +686,7 @@ export class Editor {
       this.gesture = { t: 'draw', pts: [p] };
       return;
     }
-    if (sel) {
+    if (sel && !sel.locked) {
       const hd = this.handles(sel, k);
       const reach = 28 * k;
       if (dist(p, hd.rotate) <= reach) {
@@ -623,7 +708,11 @@ export class Editor {
     if (hit) {
       this.selectedId = hit.id;
       this.currentOp = hit.op;
-      this.gesture = { t: 'move', id: hit.id, start: p, ox: hit.x, oy: hit.y };
+      if (hit.locked) {
+        // gesperrt: nichts verändern
+        this.gesture = { t: 'frozen' };
+        this.flash(this.btn.lock);
+      } else this.gesture = { t: 'move', id: hit.id, start: p, ox: hit.x, oy: hit.y };
     } else {
       this.selectedId = null;
       this.gesture = null;
@@ -637,10 +726,17 @@ export class Editor {
 
   private pointerMove(ev: PointerEvent): void {
     if (!this.pointers.has(ev.pointerId)) return;
+    if (this.clientPts.has(ev.pointerId)) this.clientPts.set(ev.pointerId, [ev.clientX, ev.clientY]);
     const p = this.toMM(ev);
     this.pointers.set(ev.pointerId, p);
     const g = this.gesture;
-    if (!g) return;
+    if (!g || g.t === 'frozen') return;
+    if (g.t === 'hzoom') {
+      if (this.clientPts.size < 2) return;
+      const [a, b] = [...this.clientPts.values()];
+      this.zoomAround([(a[0] + b[0]) / 2, (a[1] + b[1]) / 2], g.w0, g.z0 * (dist(a, b) / g.d0), g.kFit);
+      return;
+    }
     if (g.t === 'draw') {
       const last = g.pts[g.pts.length - 1];
       if (dist(last, p) > 0.4) g.pts.push(p);
@@ -705,7 +801,14 @@ export class Editor {
   private pointerUp(ev: PointerEvent): void {
     if (!this.pointers.has(ev.pointerId)) return;
     this.pointers.delete(ev.pointerId);
+    this.clientPts.delete(ev.pointerId);
     const g = this.gesture;
+    if (this.handMode) {
+      // ein Finger bleibt liegen: von dort aus weiter verschieben
+      this.gesture = null;
+      if (this.pointers.size > 0) this.startHandGesture();
+      return;
+    }
     if (g && g.t === 'draw') {
       this.gesture = null;
       this.finishStroke(g.pts);
@@ -765,6 +868,7 @@ export class Editor {
 
   private add(el: El): void {
     this.drawMode = false;
+    this.handMode = false;
     this.els.push(el);
     this.selectedId = el.id;
     this.commit();
@@ -773,6 +877,7 @@ export class Editor {
   /** Alle Formen in einer aufklappenden Auswahl neben der Leiste. */
   private openShapes(): void {
     this.drawMode = false;
+    this.handMode = false;
     this.render();
     const anchor = this.btn.shapes.getBoundingClientRect();
     const o = overlay('overlay-clear');
@@ -858,7 +963,7 @@ export class Editor {
     const t = await this.buildText(clean, font);
     if (!t) return;
     const cur = this.els.find((e) => e.id === el.id);
-    if (!cur) return;
+    if (!cur || cur.locked) return;
     // Faktor, um den das Kind den Text vergrößert/verkleinert hat
     const k = cur.text ? (cur.w / cur.text.w0 + cur.h / cur.text.h0) / 2 : 1;
     const area = surfaceSize(this.surface);
@@ -879,13 +984,13 @@ export class Editor {
   /** Taste "Schrift": Dialog mit dem vorhandenen Text und der aktuellen Schrift öffnen. */
   private editText(): void {
     const sel = this.selected;
-    if (sel && sel.kind === 'text') this.openText(sel);
+    if (sel && sel.kind === 'text' && !sel.locked) this.openText(sel);
   }
 
   private setOp(op: Op): void {
     this.currentOp = op;
     const sel = this.selected;
-    if (sel && sel.op !== op) {
+    if (sel && !sel.locked && sel.op !== op) {
       sel.op = op;
       this.commit();
     }
@@ -895,13 +1000,13 @@ export class Editor {
   private duplicate(): void {
     const sel = this.selected;
     if (!sel) return;
-    const copy: El = { ...JSON.parse(JSON.stringify(sel)), id: newId(), x: Math.min(this.bounds().maxX, sel.x + 10), y: Math.min(this.bounds().maxY, sel.y + 10) };
+    const copy: El = { ...JSON.parse(JSON.stringify(sel)), id: newId(), locked: undefined, x: Math.min(this.bounds().maxX, sel.x + 10), y: Math.min(this.bounds().maxY, sel.y + 10) };
     this.add(copy);
   }
 
   private async remove(): Promise<void> {
     const sel = this.selected;
-    if (!sel) return;
+    if (!sel || sel.locked) return;
     if (!(await confirmDialog(ICONS.trash))) return;
     this.els = this.els.filter((e) => e.id !== sel.id);
     this.selectedId = null;
@@ -926,6 +1031,7 @@ export class Editor {
   }
 
   private toggleDraw(): void {
+    this.handMode = false;
     this.drawMode = !this.drawMode;
     if (this.drawMode) this.selectedId = null;
     this.render();

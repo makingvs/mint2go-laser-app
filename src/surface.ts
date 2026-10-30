@@ -117,6 +117,15 @@ export function zoomedView(base: View, zoom: number, center?: Pt | null): View {
   return { x: cx - w / 2, y: cy - h / 2, w, h };
 }
 
+/**
+ * Mittelpunkt des Ausschnitts, damit der Flächenpunkt w (mm) beim Zoomen unter dem Bildschirmpunkt `at` bleibt.
+ * rectCenter = Mitte der Zeichenfläche auf dem Bildschirm (px), kFit = mm pro Pixel bei Zoom 1.
+ */
+export function anchoredCenter(w: Pt, at: Pt, rectCenter: Pt, kFit: number, zoom: number): Pt {
+  const k = kFit / zoom;
+  return [w[0] - (at[0] - rectCenter[0]) * k, w[1] - (at[1] - rectCenter[1]) * k];
+}
+
 export function viewFor(s: Surface, els: El[], prev: View | null): View {
   return isFree(s) ? growView(prev, els) : fixedView(s);
 }

@@ -1,0 +1,29 @@
+/* Objekt sperren (Kopfleiste) und Hand-Werkzeug (Zoom-Leiste) */
+.btn.labeled.active:not(.tool):not(.op) {
+  background: var(--blue-tint);
+  box-shadow: 0 0 0 3px var(--m-blue) inset;
+}
+.btn.labeled.active:not(.tool):not(.op) .lbl {
+  color: var(--m-navy);
+}
+.btn.zoom.hand.active {
+  background: var(--m-green);
+  box-shadow: 0 3px 0 var(--m-green-dark);
+}
+.btn.zoom.hand.active .lbl {
+  color: #fff;
+}
+.canvas.hand {
+  cursor: grab;
+}
+.canvas.hand:active {
+  cursor: grabbing;
+}
+
+/* vier Zoom-Tasten (mit Hand) passen auch bei ca. 768 px Höhe in die rechte Leiste */
+@media (max-height: 800px) and (min-height: 761px) {
+  :root {
+    --op-h: 90px;
+    --zoom-h: 58px;
+  }
+}

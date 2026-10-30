@@ -20,6 +20,8 @@ export interface El {
   h: number;
   rot: number;
   op: Op;
+  /** Gesperrt: Größe, Lage, Drehung, Art und Löschen sind gesperrt */
+  locked?: boolean;
   /** Bei Text: Schrift, Wortlaut und Maße bei der Erstellung (zum nachträglichen Ändern der Schrift) */
   text?: { font: string; value: string; w0: number; h0: number };
 }
