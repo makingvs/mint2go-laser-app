@@ -62,7 +62,7 @@ Die Pfade sind relativ (`base: './'`), die App funktioniert daher auch in einem 
 - **Exportieren-Taste** (grün, oben rechts): Auf dem iPad öffnet sich das **Teilen-Menü** → „In Dateien sichern“, AirDrop, Mail … Auf dem Computer wird die Datei heruntergeladen. Dateiname: `<Kind>_<Datum>_<Uhrzeit>.svg`.
 - **Galerie**: Pfeil-Taste an jeder Arbeit = diese Arbeit exportieren; Pfeil oben rechts = **alle Arbeiten dieses Kindes als ZIP**.
 - **Lehrkraft-Bereich → „Alle SVGs als ZIP exportieren“**: alle Kinder, je ein Ordner pro Kind.
-- Die SVG hat die Größe der Platte in mm; Schneiden = rot, Gravieren = blau, Fläche = schwarz (Farben änderbar). Gleiche Bearbeitungsarten werden vereint, Text liegt als Pfad vor.
+- Die SVG hat die Größe der Platte in mm; Schneiden = rot, Gravieren = blau, Fläche = schwarz (Farben änderbar). **Alles, was man auf der Fläche sieht, kommt in die Datei:** Bei Schneiden und Gravieren bleibt jede Linie erhalten, auch Formen in Formen (Löcher) und Überschneidungen; nur genau doppelte Linienstücke entfallen, damit nichts zweimal geschnitten wird. Flächengravur wird vereint. Überlappende Schnittformen werden also **nicht** mehr automatisch verbunden (das geht bei Bedarf in xTool Creative Space mit „Kombinieren“). Teile, die über die Zeichenfläche ragen, werden nicht abgeschnitten: Die Datei wird dann entsprechend größer. Text liegt als Pfad vor.
 
 Wichtig: Arbeiten liegen **nur auf dem jeweiligen iPad**. Wer Arbeiten dauerhaft braucht, exportiert sie. Löscht Safari die Website-Daten (z. B. „Verlauf und Websitedaten löschen“, oder bei längerer Nichtbenutzung im Browser), sind sie weg; als Home-Bildschirm-App ist der Speicher geschützter, trotzdem regelmäßig sichern.
 
@@ -137,7 +137,34 @@ Neue Formen: in `src/shapes.ts` ergänzen (ID, Gruppe, Name, Geometrie); Symbol 
 
 ## Tastatur
 
-Text und Bildersuche nutzen eine Bildschirmtastatur im **deutschen Layout (QWERTZ)**: Ziffernreihe mit ß und Löschen, darunter QWERTZUIOPÜ, ASDFGHJKLÖÄ (jeweils wie auf einer echten Tastatur versetzt), YXCVBNM mit Komma, Punkt und Bindestrich, Umschalt (Groß/Klein, nur beim Text) und Leertaste. Definition: `src/keyboard.ts` (`GERMAN_ROWS`).
+Text und Bildersuche nutzen die **Tastatur des Geräts** (iPad-Bildschirmtastatur bzw. PC-Tastatur). Das Eingabefeld steht oben im Fenster, damit die iPad-Tastatur nichts verdeckt; die Eingabe wird mit ✓ oder der Eingabetaste übernommen. Die eigene Bildschirmtastatur (`src/keyboard.ts`) nutzt nur noch die 3D-App.
+
+## Tastenkürzel
+
+Mit PC-Tastatur oder einer Tastatur am Tablet (Strg oder Befehlstaste):
+
+| Taste | Wirkung |
+| --- | --- |
+| Strg+C / Strg+V | Teil kopieren / einfügen (auch in eine andere Arbeit; jedes Einfügen rückt 10 mm weiter, die Kopie ist nie gesperrt) |
+| Strg+X | Ausschneiden (mit Rückfrage) |
+| Strg+Z, Strg+Y oder Strg+Umschalt+Z | Rückgängig, Wiederholen |
+| Entf, Rücktaste | Löschen (mit Rückfrage) |
+| Pfeiltasten | Teil um 1 mm verschieben, mit Umschalt um 10 mm |
+| Esc | Auswahl aufheben, Hand/Messen/Freihand beenden |
+
+Während ein Fenster offen ist oder im Eingabefeld getippt wird, sind die Kürzel aus.
+
+## Auswahl: Teile nur verschieben
+
+Oben die Taste **Auswahl**: Teile lassen sich nur noch antippen und verschieben. Griffe und das Skalieren/Drehen mit zwei Fingern sind aus, damit nichts versehentlich größer oder schief wird. Die Maße-Leiste bleibt nutzbar. Die Taste bleibt an, bis man sie wieder antippt (auch wenn man neue Teile hinzufügt).
+
+## Messen
+
+Oben die Taste **Messen**: Mit dem Finger oder der Maus von einem Punkt zum anderen ziehen. Die Messlinie zeigt die Länge in mm und darunter den Abstand waagerecht und senkrecht. Ist **Fangen** an, rasten die Endpunkte an Ecken, Kantenmitten und Mitten der Teile und der Fläche ein. Die Messlinie kommt nicht in die Datei; sie verschwindet beim Beenden von Messen.
+
+## Runde Ecken
+
+Das abgerundete Quadrat und die Sprechblase behalten beim Skalieren **kreisrunde Ecken**, auch wenn sie stark gestreckt werden: Der Radius richtet sich nach der kürzeren Seite (`src/shapes.ts`, `fittedBase`).
 
 ## Größe ändern an den Ecken
 

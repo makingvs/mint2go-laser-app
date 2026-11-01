@@ -23,10 +23,18 @@ for (const ev of ['gesturestart', 'gesturechange', 'gestureend', 'contextmenu', 
 document.addEventListener(
   'touchmove',
   (e) => {
-    if (!(e.target as HTMLElement).closest('.pick-grid, .tform, .card-grid, .keys, .kb, .left-rail, .font-row, .werk-list, .guide-panel')) e.preventDefault();
+    if (!(e.target as HTMLElement).closest('.pick-grid, .tform, .card-grid, .keys, .kb, .left-rail, .font-row, .werk-list, .guide-panel, .box-panel, .text-panel')) e.preventDefault();
   },
   { passive: false },
 );
+
+// Höhe über der Bildschirmtastatur des iPads: Fenster mit Eingabefeld passen sich an
+const viewport = window.visualViewport;
+if (viewport) {
+  const setHeight = () => document.documentElement.style.setProperty('--vvh', `${viewport.height}px`);
+  viewport.addEventListener('resize', setHeight);
+  setHeight();
+}
 
 async function showProfiles(): Promise<void> {
   if (updatePending) return location.reload();

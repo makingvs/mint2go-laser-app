@@ -1,5 +1,5 @@
 // SVG-Export für xTool Creative Space: Maße in mm, nur Pfade, feste Farben je Bearbeitungsart.
-import { ringToPath, unionShapes, type Shape } from './geometry';
+import { featureSize, removeDoubledLines, ringToPath, unionShapes, type Polyline, type Shape } from './geometry';
 import { worldShape, type Design, type El, type Op, type Settings } from './model';
 import { exportFrame } from './surface';
 
@@ -9,25 +9,31 @@ function fmt(n: number): string {
   return String(+n.toFixed(3));
 }
 
-/** Pfaddaten je Bearbeitungsart: gleiche Arten werden vereinigt, offene Linien bleiben Linien. */
+/** Linie ohne nennenswerte Fläche (mm): lässt sich nicht füllen, wird als Linie graviert */
+const MIN_FILL_WIDTH = 0.3;
+
+/**
+ * Pfaddaten je Bearbeitungsart. Schneiden/Gravieren: jede Linie, die man auf der Fläche sieht, kommt in die Datei
+ * (auch Formen in Formen, z. B. Löcher, und Überschneidungen); nur genau doppelte Linienstücke entfallen.
+ * Flächengravur: gleiche Art wird vereinigt, sonst würden sich Überlappungen gegenseitig auslöschen.
+ */
 export function buildPaths(elements: El[]): Record<Op, { closed: Shape; open: [number, number][][] }> {
-  const out = {} as Record<Op, { closed: Shape; open: [number, number][][] }>;
-  for (const op of ['cut', 'engrave', 'fill'] as Op[]) {
-    const closedShapes: Shape[] = [];
-    const open: [number, number][][] = [];
-    for (const e of elements) {
-      if (e.op !== op) continue;
-      const ws = worldShape(e);
-      if (e.open && op !== 'fill') {
-        for (const r of ws) open.push(r);
-      } else {
-        // Flächengravur nur für geschlossene Formen: offene Linien werden geschlossen.
-        closedShapes.push(ws);
-      }
+  const lines: Record<'cut' | 'engrave', Polyline[]> = { cut: [], engrave: [] };
+  const fills: Shape[] = [];
+  for (const e of elements) {
+    const ws = worldShape(e);
+    if (e.op === 'fill') {
+      if (e.open && featureSize(ws) < MIN_FILL_WIDTH) for (const r of ws) lines.engrave.push({ pts: r, closed: false });
+      else fills.push(ws); // Flächengravur nur für geschlossene Formen: offene Linien werden geschlossen.
+    } else {
+      for (const r of ws) lines[e.op].push({ pts: r, closed: !e.open });
     }
-    out[op] = { closed: unionShapes(closedShapes), open };
   }
-  return out;
+  const split = (list: Polyline[]) => {
+    const kept = removeDoubledLines(list);
+    return { closed: kept.filter((l) => l.closed).map((l) => l.pts), open: kept.filter((l) => !l.closed).map((l) => l.pts) };
+  };
+  return { cut: split(lines.cut), engrave: split(lines.engrave), fill: { closed: unionShapes(fills), open: [] } };
 }
 
 export function exportSvg(design: Pick<Design, 'elements' | 'surface'>, settings: Settings): string {

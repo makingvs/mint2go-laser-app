@@ -24,9 +24,9 @@ describe('SVG-Export', () => {
     expect(svg).not.toMatch(/<(image|text|filter|use)\b/);
   });
 
-  it('vereint überlappende Formen gleicher Art zu einem Umriss', () => {
-    const svg = exportSvg({ elements: [shape('square', 'cut', 100, 100, 40), shape('square', 'cut', 120, 100, 40)] }, DEFAULT_SETTINGS);
-    const d = /id="schneiden" d="([^"]+)"/.exec(svg)![1];
+  it('vereint überlappende Flächengravur zu einem Umriss', () => {
+    const svg = exportSvg({ elements: [shape('square', 'fill', 100, 100, 40), shape('square', 'fill', 120, 100, 40)] }, DEFAULT_SETTINGS);
+    const d = /id="flaechengravur" d="([^"]+)"/.exec(svg)![1];
     expect((d.match(/M/g) ?? []).length).toBe(1);
     expect(d.split('L').length - 1).toBeLessThanOrEqual(3); // Rechteck: 4 Ecken
   });

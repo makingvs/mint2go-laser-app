@@ -133,8 +133,14 @@ export function viewFor(s: Surface, els: El[], prev: View | null): View {
 /** Rahmen der exportierten SVG: Werkstückgröße, bei unendlicher Fläche der Inhalt (nach links oben verschoben). */
 export function exportFrame(design: Pick<Design, 'elements' | 'surface'>, settings: Pick<Settings, 'plate'>): { w: number; h: number; dx: number; dy: number } {
   const s = design.surface ?? defaultSurface(settings);
-  if (!isFree(s)) return { w: s.w, h: s.h, dx: 0, dy: 0 };
   const b = contentBounds(design.elements);
+  if (!isFree(s)) {
+    // Teile über dem Werkstück dürfen nicht abgeschnitten werden: Rahmen wächst mit
+    if (!b || (b.minX >= 0 && b.minY >= 0 && b.maxX <= s.w && b.maxY <= s.h)) return { w: s.w, h: s.h, dx: 0, dy: 0 };
+    const x0 = Math.min(0, b.minX);
+    const y0 = Math.min(0, b.minY);
+    return { w: Math.max(s.w, b.maxX) - x0, h: Math.max(s.h, b.maxY) - y0, dx: -x0, dy: -y0 };
+  }
   if (!b) return { w: settings.plate.width, h: settings.plate.height, dx: 0, dy: 0 };
   return { w: Math.max(b.maxX - b.minX, 0.1), h: Math.max(b.maxY - b.minY, 0.1), dx: -b.minX, dy: -b.minY };
 }

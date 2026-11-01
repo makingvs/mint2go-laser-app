@@ -1,7 +1,6 @@
 // Die Arbeitsfläche: Formen setzen, verschieben, drehen, skalieren, zeichnen, exportieren.
 import { storage, type Profile } from './storage';
 import { openTraceDialog } from './imageDialog';
-import { buildKeyboard } from './keyboard';
 import { saveSvg } from './exporter';
 import { openSaveDialog } from './saveDialog';
 import { svgToShape, svgToTemplate } from './svgImport';
@@ -16,6 +15,8 @@ import { canvasBackground, elementMarkup } from './render';
 import { MAX_ZOOM, anchoredCenter, defaultSurface, isFree, isOutside, rectSurface, surfaceKey, surfaceSize, viewFor, zoomedView, type View } from './surface';
 import { openSurfaceDialog } from './surfaceDialog';
 import { snapMove, snapTolerance, type Box, type Guide } from './snap';
+import { boxPoints, measureLabel, snapToPoint } from './measure';
+import { shortcutFor } from './shortcuts';
 import { SHAPE_GROUPS, SHAPE_LABELS, baseShape, type ShapeId } from './shapes';
 import { GLYPH_HEIGHT, textShape } from './text';
 import { FONTS, fontStyle, fontTextShape, textInfo, type FontChoice } from './fonts';
@@ -41,11 +42,16 @@ type Gesture =
   | { t: 'draw'; pts: Pt[] }
   | { t: 'pan'; sx: number; sy: number; c0: Pt; k0: number }
   | { t: 'hzoom'; d0: number; z0: number; w0: Pt; kFit: number }
-  | { t: 'frozen' };
+  | { t: 'frozen' }
+  | { t: 'measure' };
 
 const OP_ICON: Record<Op, string> = { cut: ICONS.scissors, engrave: ICONS.pen, fill: ICONS.roller };
 const OP_LABEL: Record<Op, string> = { cut: 'Schneiden', engrave: 'Gravieren', fill: 'Fläche gravieren' };
 const OP_SHORT: Record<Op, string> = { cut: 'Schneiden', engrave: 'Gravieren', fill: 'Füllen' };
+
+/** Zwischenablage für Strg+C / Strg+V (bleibt beim Wechsel zwischen Arbeiten erhalten) */
+let clipboard: string | null = null;
+let pasteCount = 0;
 
 export class Editor {
   readonly root = h('div', 'editor');
@@ -66,6 +72,12 @@ export class Editor {
   })();
   private guides: Guide[] = [];
   private clientPts = new Map<number, Pt>();
+  /** Auswahl-Werkzeug: Teile lassen sich nur auswählen und verschieben (keine Griffe) */
+  private moveOnly = false;
+  /** Mess-Werkzeug */
+  private measureMode = false;
+  private measureLine: { a: Pt; b: Pt } | null = null;
+  private measurePts: Pt[] = [];
   private gesture: Gesture | null = null;
   private pointers = new Map<number, Pt>();
   private changed = false;
@@ -92,6 +104,7 @@ export class Editor {
   /** in dieser Sitzung exportiert (für den Export-Schritt im geführten Modus) */
   private exported = false;
   private onResize = () => this.render();
+  private onKey = (ev: KeyboardEvent) => this.keyDown(ev);
   private onHide = () => {
     if (document.visibilityState === 'hidden') void this.saveNow();
   };
@@ -105,6 +118,7 @@ export class Editor {
     this.startCoach();
     this.setStatus(storage.persistent);
     window.addEventListener('resize', this.onResize);
+    document.addEventListener('keydown', this.onKey);
     document.addEventListener('visibilitychange', this.onHide);
     window.addEventListener('pagehide', this.onHide);
     requestAnimationFrame(() => this.render());
@@ -151,7 +165,9 @@ export class Editor {
     this.btn.undo = button('btn labeled', lab(ICONS.undo, 'Zurück'), () => this.undo(), 'Rückgängig');
     this.btn.redo = button('btn labeled', lab(ICONS.redo, 'Vor'), () => this.redo(), 'Wiederholen');
     this.btn.surface = button('btn labeled', lab(ICONS.canvas, 'Fläche'), () => this.changeSurface(), 'Zeichenfläche');
-    left.append(this.btn.gallery, this.btn.undo, this.btn.redo, this.btn.surface);
+    this.btn.select = button('btn labeled', lab(ICONS.cursor, 'Auswahl'), () => this.toggleSelect(), 'Auswahl: Teile nur verschieben');
+    this.btn.measure = button('btn labeled', lab(ICONS.ruler, 'Messen'), () => this.toggleMeasure(), 'Messen');
+    left.append(this.btn.gallery, this.btn.undo, this.btn.redo, this.btn.surface, this.btn.select, this.btn.measure);
 
     const center = h('div', 'top-center');
     this.status = h('div', 'status', ICONS.cloudOk);
@@ -451,14 +467,128 @@ export class Editor {
     return { b0: bbox(worldShape(el)), targets };
   }
 
+  /** Freihand, Hand und Messen beenden (die Auswahl-Taste bleibt, bis man sie wieder ausschaltet). */
+  private leaveTools(): void {
+    this.drawMode = false;
+    this.handMode = false;
+    this.measureMode = false;
+    this.measureLine = null;
+    this.gesture = null;
+  }
+
   /** Hand-Werkzeug ein/aus. */
   private toggleHand(): void {
-    this.handMode = !this.handMode;
-    if (this.handMode) {
-      this.drawMode = false;
-      this.gesture = null;
-    }
+    const on = !this.handMode;
+    this.leaveTools();
+    this.handMode = on;
     this.render();
+  }
+
+  /** Auswahl-Werkzeug ein/aus: Teile nur verschieben. */
+  private toggleSelect(): void {
+    const on = !this.moveOnly;
+    this.leaveTools();
+    this.moveOnly = on;
+    this.render();
+  }
+
+  /** Mess-Werkzeug ein/aus. */
+  private toggleMeasure(): void {
+    const on = !this.measureMode;
+    this.leaveTools();
+    this.measureMode = on;
+    this.render();
+  }
+
+  /** Fangpunkte zum Messen: Ecken/Mitten aller Teile und der Fläche, Eckpunkte einfacher Formen. */
+  private measureTargets(): Pt[] {
+    if (!this.snapOn) return [];
+    const pts: Pt[] = [];
+    for (const e of this.els) {
+      const ws = worldShape(e);
+      pts.push(...boxPoints(bbox(ws)));
+      for (const r of ws) if (r.length <= 24) pts.push(...r);
+    }
+    if (!isFree(this.surface)) pts.push(...boxPoints({ minX: 0, maxX: this.surface.w, minY: 0, maxY: this.surface.h }));
+    return pts;
+  }
+
+  private snapMeasure(p: Pt): Pt {
+    return snapToPoint(p, this.measurePts, snapTolerance(this.k(), 14));
+  }
+
+  /** Messlinie mit Endpunkten und Beschriftung (nur Anzeige, kommt nicht in die Datei). */
+  private measureMarkup(a: Pt, b: Pt, k: number): string {
+    const line = `<line x1="${a[0]}" y1="${a[1]}" x2="${b[0]}" y2="${b[1]}" stroke="#3757a9" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
+    const dot = (p: Pt) => `<circle cx="${p[0]}" cy="${p[1]}" r="${6 * k}" fill="#fff" stroke="#3757a9" stroke-width="3" vector-effect="non-scaling-stroke"/>`;
+    if (dist(a, b) < 0.05) return dot(a);
+    const { main, sub } = measureLabel(a, b);
+    const w = Math.max(main.length * 13, sub.length * 8.5) + 24;
+    const box = `<g transform="translate(${(a[0] + b[0]) / 2} ${(a[1] + b[1]) / 2}) scale(${k})"><rect x="${-w / 2}" y="-58" width="${w}" height="50" rx="12" fill="#3757a9"/><text x="0" y="-37" text-anchor="middle" fill="#fff" font-size="22" font-weight="800" font-family="Jost, sans-serif">${main}</text><text x="0" y="-16" text-anchor="middle" fill="#dbe6ff" font-size="15" font-weight="600" font-family="Jost, sans-serif">${sub}</text></g>`;
+    return line + dot(a) + dot(b) + box;
+  }
+
+  // ---------- Tastenkürzel ----------
+  private keyDown(ev: KeyboardEvent): void {
+    const t = ev.target as HTMLElement | null;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (document.querySelector('.overlay')) return; // Fenster offen
+    const sc = shortcutFor(ev);
+    if (!sc) return;
+    ev.preventDefault();
+    const sel = this.selected;
+    switch (sc) {
+      case 'copy':
+        this.copySelected();
+        break;
+      case 'cut':
+        this.copySelected();
+        void this.remove();
+        break;
+      case 'paste':
+        this.paste();
+        break;
+      case 'undo':
+        this.undo();
+        break;
+      case 'redo':
+        this.redo();
+        break;
+      case 'delete':
+        void this.remove();
+        break;
+      case 'deselect':
+        this.leaveTools();
+        this.selectedId = null;
+        this.render();
+        break;
+      default: {
+        if (!sel || sel.locked) break;
+        const step = ev.shiftKey ? 10 : 1;
+        if (sc === 'left') sel.x -= step;
+        else if (sc === 'right') sel.x += step;
+        else if (sc === 'up') sel.y -= step;
+        else sel.y += step;
+        this.commit();
+      }
+    }
+  }
+
+  private copySelected(): void {
+    const sel = this.selected;
+    if (!sel) return;
+    clipboard = JSON.stringify(sel);
+    pasteCount = 0;
+  }
+
+  /** Eingefügtes Teil ist immer frei (auch wenn das Original gesperrt ist) und rückt je Einfügen 10 mm weiter. */
+  private paste(): void {
+    if (!clipboard) return;
+    const src = JSON.parse(clipboard) as El;
+    pasteCount++;
+    const bd = this.bounds();
+    const off = 10 * pasteCount;
+    this.add({ ...src, id: newId(), locked: undefined, x: Math.min(bd.maxX, src.x + off), y: Math.min(bd.maxY, src.y + off) });
   }
 
   /** Ein Finger/Maus: Fläche verschieben; zwei Finger: zoomen und verschieben. */
@@ -540,6 +670,7 @@ export class Editor {
 
   destroy(): void {
     window.removeEventListener('resize', this.onResize);
+    document.removeEventListener('keydown', this.onKey);
     document.removeEventListener('visibilitychange', this.onHide);
     window.removeEventListener('pagehide', this.onHide);
     cancelAnimationFrame(this.raf);
@@ -607,7 +738,8 @@ export class Editor {
       const [x1, y1, x2, y2] = gd.axis === 'x' ? [gd.pos, gd.a, gd.pos, gd.b] : [gd.a, gd.pos, gd.b, gd.pos];
       out += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#e01070" stroke-width="1.6" stroke-dasharray="6 4" vector-effect="non-scaling-stroke"/>`;
     }
-    if (sel && !this.drawMode && !this.handMode) out += this.selectionMarkup(sel, k);
+    if (sel && !this.drawMode && !this.handMode && !this.measureMode) out += this.selectionMarkup(sel, k);
+    if (this.measureLine) out += this.measureMarkup(this.measureLine.a, this.measureLine.b, k);
     const g = this.gesture;
     if (g && g.t === 'draw' && g.pts.length > 1) {
       out += `<path d="M${g.pts.map((p) => `${p[0].toFixed(2)} ${p[1].toFixed(2)}`).join('L')}" fill="none" stroke="${this.settings.colors[this.currentOp]}" stroke-width="3" vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round"/>`;
@@ -631,9 +763,9 @@ export class Editor {
 
   private selectionMarkup(e: El, k: number): string {
     const hd = this.handles(e, k);
-    if (e.locked) {
+    if (e.locked || this.moveOnly) {
       const pts = hd.corners.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(' ');
-      return `<polygon points="${pts}" fill="none" stroke="#8993ad" stroke-width="2.5" stroke-dasharray="3 5" vector-effect="non-scaling-stroke"/>`;
+      return `<polygon points="${pts}" fill="none" stroke="${e.locked ? '#8993ad' : '#3757a9'}" stroke-width="2.5" stroke-dasharray="3 5" vector-effect="non-scaling-stroke"/>`;
     }
     const poly = hd.corners.map((p) => `${p[0].toFixed(2)},${p[1].toFixed(2)}`).join(' ');
     let s = `<polygon points="${poly}" fill="none" stroke="#3757a9" stroke-width="2.5" stroke-dasharray="7 5" vector-effect="non-scaling-stroke"/>`;
@@ -658,6 +790,9 @@ export class Editor {
     this.btn.lock.innerHTML = lab(frozen ? ICONS.objUnlock : ICONS.objLock, frozen ? 'Frei' : 'Sperre');
     this.btn.lock.setAttribute('aria-label', frozen ? 'Objekt entsperren' : 'Objekt sperren');
     this.btn.hand.classList.toggle('active', this.handMode);
+    this.btn.select.classList.toggle('active', this.moveOnly);
+    this.btn.measure.classList.toggle('active', this.measureMode);
+    this.svg.classList.toggle('measuring', this.measureMode);
     this.btn.snap.classList.toggle('active', this.snapOn);
     this.svg.classList.toggle('hand', this.handMode);
     for (const o of ['cut', 'engrave', 'fill']) this.btn[`op-${o}`].disabled = frozen;
@@ -697,10 +832,20 @@ export class Editor {
       this.startHandGesture();
       return;
     }
+    if (this.measureMode) {
+      if (this.pointers.size === 1) {
+        this.measurePts = this.measureTargets();
+        const a = this.snapMeasure(p);
+        this.measureLine = { a, b: a };
+        this.gesture = { t: 'measure' };
+        this.requestRender();
+      }
+      return;
+    }
     const k = this.k();
     const sel = this.selected;
 
-    if (this.pointers.size === 2 && sel && !sel.locked && !this.drawMode) {
+    if (this.pointers.size === 2 && sel && !sel.locked && !this.drawMode && !this.moveOnly) {
       const [a, b] = [...this.pointers.values()];
       this.gesture = {
         t: 'pinch',
@@ -723,7 +868,7 @@ export class Editor {
       this.gesture = { t: 'draw', pts: [p] };
       return;
     }
-    if (sel && !sel.locked) {
+    if (sel && !sel.locked && !this.moveOnly) {
       const hd = this.handles(sel, k);
       const reach = 28 * k;
       if (dist(p, hd.rotate) <= reach) {
@@ -768,6 +913,11 @@ export class Editor {
     this.pointers.set(ev.pointerId, p);
     const g = this.gesture;
     if (!g || g.t === 'frozen') return;
+    if (g.t === 'measure') {
+      if (this.measureLine) this.measureLine.b = this.snapMeasure(p);
+      this.requestRender();
+      return;
+    }
     if (g.t === 'hzoom') {
       if (this.clientPts.size < 2) return;
       const [a, b] = [...this.clientPts.values()];
@@ -917,8 +1067,7 @@ export class Editor {
   }
 
   private add(el: El): void {
-    this.drawMode = false;
-    this.handMode = false;
+    this.leaveTools();
     this.els.push(el);
     this.selectedId = el.id;
     this.commit();
@@ -926,8 +1075,7 @@ export class Editor {
 
   /** Alle Formen in einer aufklappenden Auswahl neben der Leiste. */
   private openShapes(): void {
-    this.drawMode = false;
-    this.handMode = false;
+    this.leaveTools();
     this.render();
     const anchor = this.btn.shapes.getBoundingClientRect();
     const o = overlay('overlay-clear');
@@ -1081,8 +1229,10 @@ export class Editor {
   }
 
   private toggleDraw(): void {
-    this.handMode = false;
-    this.drawMode = !this.drawMode;
+    const on = !this.drawMode;
+    this.leaveTools();
+    this.moveOnly = false;
+    this.drawMode = on;
     if (this.drawMode) this.selectedId = null;
     this.render();
   }
@@ -1134,7 +1284,7 @@ export class Editor {
   // ---------- Bildersuche und Text ----------
   /** Suche nach Bildern im Internet (Iconify). */
   private openSearch(): void {
-    this.drawMode = false;
+    this.leaveTools();
     void storage.getSearchConfig().then((cfg) =>
       openOnlineSearch(cfg, async (svg, ref) => {
         const rings = svgToShape(svg);
@@ -1148,8 +1298,8 @@ export class Editor {
   }
 
   private openText(edit?: El): void {
-    this.drawMode = false;
-    const o = overlay('overlay-dim');
+    this.leaveTools();
+    const o = overlay('overlay-dim overlay-top');
     const panel = h('div', 'panel text-panel');
     const preview = h('div', 'text-preview');
     const fontRow = h('div', 'font-row');
@@ -1203,27 +1353,34 @@ export class Editor {
       fontRow.append(chip);
     }
 
-    const MAX_TEXT = 14;
-    const press = (ch: string) => {
-      if (text.length < MAX_TEXT) text += ch;
+    // Eingabe über die Tastatur des Geräts (iPad-Bildschirmtastatur bzw. PC-Tastatur)
+    const input = h('input', 'name-input text-input');
+    input.type = 'text';
+    input.maxLength = 24;
+    input.value = text;
+    input.placeholder = 'Text';
+    input.autocomplete = 'off';
+    input.spellcheck = false;
+    input.enterKeyHint = 'done';
+    input.setAttribute('autocorrect', 'off');
+    input.setAttribute('aria-label', 'Text');
+    input.addEventListener('input', () => {
+      text = input.value;
       refresh();
-    };
-    const keyboard = buildKeyboard({
-      shift: true,
-      onChar: press,
-      onSpace: () => press(' '),
-      onBackspace: () => {
-        text = text.slice(0, -1);
-        refresh();
-      },
     });
-    const keys = keyboard.el;
+    input.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter') return;
+      e.preventDefault();
+      if (!ok.disabled) ok.click();
+    });
 
     const head = h('div', 'panel-head');
-    head.append(button('btn', ICONS.cross, () => o.close(), 'Schließen'), preview, ok);
-    panel.append(head, fontRow, keys);
+    head.append(button('btn', ICONS.cross, () => o.close(), 'Schließen'), input, ok);
+    panel.append(head, preview, fontRow);
     o.root.append(panel);
     refresh();
+    input.focus(); // direkt im Tipp, sonst öffnet das iPad seine Tastatur nicht
+    if (text) input.select();
   }
 
   // ---------- Speichern, Exportieren, Verlassen ----------

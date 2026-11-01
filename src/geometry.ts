@@ -318,6 +318,111 @@ function dropCollinear(r: Ring): Ring {
   return out.length >= 3 ? out : r;
 }
 
+export interface Polyline {
+  pts: Pt[];
+  closed: boolean;
+}
+
+/**
+ * Entfernt Linienstücke, die genau auf einer früheren Linie liegen (kein doppeltes Schneiden an derselben Stelle).
+ * Alles andere bleibt, wie es ist: auch Linien innerhalb anderer Formen und Überschneidungen.
+ */
+export function removeDoubledLines(lines: Polyline[], tol = 1e-3): Polyline[] {
+  const out: Polyline[] = [];
+  const done: { pts: Pt[]; closed: boolean; box: BBox }[] = [];
+  const near = (a: BBox, b: BBox) => a.minX <= b.maxX + tol && b.minX <= a.maxX + tol && a.minY <= b.maxY + tol && b.minY <= a.maxY + tol;
+  for (const line of lines) {
+    const pts = line.pts;
+    if (pts.length < 2) continue;
+    const box = bbox([pts]);
+    const others = done.filter((d) => near(d.box, box));
+    const edges = line.closed ? pts.length : pts.length - 1;
+    const free: [number, number][][] = []; // je Kante die freien Abschnitte (0..1)
+    let touched = false;
+    for (let i = 0; i < edges; i++) {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      const len = dist(a, b);
+      const covered: [number, number][] = [];
+      if (len > tol) {
+        const ux = (b[0] - a[0]) / len;
+        const uy = (b[1] - a[1]) / len;
+        const minX = Math.min(a[0], b[0]) - tol;
+        const maxX = Math.max(a[0], b[0]) + tol;
+        const minY = Math.min(a[1], b[1]) - tol;
+        const maxY = Math.max(a[1], b[1]) + tol;
+        for (const o of others) {
+          const n = o.closed ? o.pts.length : o.pts.length - 1;
+          for (let k = 0; k < n; k++) {
+            const c = o.pts[k];
+            const d = o.pts[(k + 1) % o.pts.length];
+            if (Math.max(c[0], d[0]) < minX || Math.min(c[0], d[0]) > maxX || Math.max(c[1], d[1]) < minY || Math.min(c[1], d[1]) > maxY) continue;
+            const off = (q: Pt) => Math.abs((q[0] - a[0]) * uy - (q[1] - a[1]) * ux);
+            if (off(c) > tol || off(d) > tol) continue;
+            const s0 = ((c[0] - a[0]) * ux + (c[1] - a[1]) * uy) / len;
+            const s1 = ((d[0] - a[0]) * ux + (d[1] - a[1]) * uy) / len;
+            const lo = Math.max(0, Math.min(s0, s1));
+            const hi = Math.min(1, Math.max(s0, s1));
+            if ((hi - lo) * len > tol) covered.push([lo, hi]);
+          }
+        }
+      }
+      covered.sort((p, q) => p[0] - q[0]);
+      const rest: [number, number][] = [];
+      let at = 0;
+      for (const [lo, hi] of covered) {
+        if (lo * len > at * len + tol) rest.push([at, lo]);
+        at = Math.max(at, hi);
+      }
+      if ((1 - at) * len > tol || covered.length === 0) rest.push([at, 1]);
+      if (covered.length) touched = true;
+      free.push(rest);
+    }
+    done.push({ pts, closed: line.closed, box });
+    if (!touched) {
+      out.push(line);
+      continue;
+    }
+    // Reststücke zu Linienzügen verbinden
+    const parts: Pt[][] = [];
+    let cur: Pt[] | null = null;
+    const at = (i: number, s: number): Pt => {
+      const a = pts[i];
+      const b = pts[(i + 1) % pts.length];
+      return s <= 0 ? a : s >= 1 ? b : [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s];
+    };
+    for (let i = 0; i < edges; i++) {
+      for (const [lo, hi] of free[i]) {
+        if (cur && lo === 0) cur.push(at(i, hi));
+        else {
+          if (cur) parts.push(cur);
+          cur = [at(i, lo), at(i, hi)];
+        }
+        if (hi < 1) {
+          parts.push(cur);
+          cur = null;
+        }
+      }
+      if (free[i].length === 0 && cur) {
+        parts.push(cur);
+        cur = null;
+      }
+    }
+    if (cur) parts.push(cur);
+    // geschlossene Linie: letztes und erstes Stück hängen zusammen
+    if (line.closed && parts.length > 1) {
+      const first = parts[0];
+      const last = parts[parts.length - 1];
+      if (dist(first[0], last[last.length - 1]) <= tol) {
+        parts[0] = [...last, ...first.slice(1)];
+        parts.pop();
+      }
+    }
+    for (const p of parts) out.push({ pts: p, closed: false });
+  }
+  return out;
+}
+
 /** Fläche der Form (Even-Odd, Ringe nach Normalisierung). */
 export function shapeArea(shape: Shape): number {
   const n = normalizeShape(shape);

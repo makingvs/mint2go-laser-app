@@ -56,12 +56,12 @@ function starPoints(n: number, inner: number): Ring {
   });
 }
 
-function roundedRect(hw: number, hh: number, r: number): Ring {
+function roundedRect(hw: number, hh: number, r: number, n = 8): Ring {
   return [
-    ...arc(hw - r, -hh + r, r, -90, 0, 8),
-    ...arc(hw - r, hh - r, r, 0, 90, 8),
-    ...arc(-hw + r, hh - r, r, 90, 180, 8),
-    ...arc(-hw + r, -hh + r, r, 180, 270, 8),
+    ...arc(hw - r, -hh + r, r, -90, 0, n),
+    ...arc(hw - r, hh - r, r, 0, 90, n),
+    ...arc(-hw + r, hh - r, r, 90, 180, n),
+    ...arc(-hw + r, -hh + r, r, 180, 270, n),
   ];
 }
 
@@ -80,6 +80,36 @@ function drop(): Ring {
   const r = 0.65;
   const beta = (Math.acos(r / (c + 1)) * 180) / Math.PI;
   return [[0, -1], ...arc(0, c, r, -90 + beta, 270 - beta, 40)];
+}
+
+/** Radius im Verhältnis zur kürzeren Seite (abgerundetes Quadrat) */
+export const ROUND_RATIO = 0.19;
+const fitted = new Map<string, Shape>();
+
+/**
+ * Formen mit runden Ecken passend zu den echten Maßen (Einheitsquadrat um 0,0): Beim Strecken bleiben die Ecken
+ * kreisrund und werden nicht zu Ellipsen verzerrt. null = Form hat keine runden Ecken.
+ */
+export function fittedBase(id: string, w: number, h: number): Shape | null {
+  if ((id !== 'roundrect' && id !== 'speech') || !(w > 0) || !(h > 0)) return null;
+  const key = `${id}|${w.toFixed(2)}|${h.toFixed(2)}`;
+  const hit = fitted.get(key);
+  if (hit) return hit;
+  let rings: Shape;
+  if (id === 'roundrect') {
+    rings = [roundedRect(w / 2, h / 2, ROUND_RATIO * Math.min(w, h), 20)];
+  } else {
+    // Sprechblase: Körper mit runden Ecken, Spitze wird mitgestreckt
+    const sx = w / 2;
+    const sy = h / 1.67;
+    const body = roundedRect(sx, 0.62 * sy, 0.3 * Math.min(sx, sy), 20);
+    const tail: Ring = [[-0.55 * sx, 0.45 * sy], [-0.75 * sx, 1.05 * sy], [0.05 * sx, 0.45 * sy]];
+    rings = unionShapes([[body], [tail]]).map((r) => r.map(([x, y]) => [x, y - 0.215 * sy] as Pt));
+  }
+  const out = rings.map((r) => r.map(([x, y]) => [x / w, y / h] as Pt));
+  if (fitted.size > 300) fitted.clear();
+  fitted.set(key, out);
+  return out;
 }
 
 const cache = new Map<ShapeId, Shape>();

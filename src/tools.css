@@ -29,3 +29,34 @@
     --ico: 30px;
   }
 }
+
+/* Fenster mit Eingabefeld: oben, damit die Bildschirmtastatur nichts verdeckt */
+.overlay-top {
+  align-items: flex-start;
+}
+.overlay-top .panel {
+  max-height: calc(var(--vvh, 100vh) - 36px);
+}
+.overlay-top .search-panel {
+  height: min(700px, calc(var(--vvh, 100vh) - 36px));
+}
+.text-panel {
+  overflow-y: auto;
+}
+.text-panel .text-preview {
+  flex: none;
+  width: 100%;
+  height: 96px;
+}
+.text-input,
+.search-input {
+  font-weight: 700;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.search-body .search-results {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+.canvas.measuring {
+  cursor: crosshair;
+}

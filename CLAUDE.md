@@ -32,7 +32,8 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 - Text-Teile merken Schrift/Wortlaut (El.text) und sind über die Taste "Schrift" nachträglich änderbar (replaceText)
 - Layout: Größen über CSS-Variablen je Fensterhöhe (:root + @media max-height 760/640); nach Layout-Änderungen auf mehreren Größen prüfen (Überdeckungen/Abschneiden)
 
-- Tastatur: deutsches Layout QWERTZ (src/keyboard.ts) für Text und Suche
+- Tastatur: die des Geräts (iPad bzw. PC) für Text und Suche, Eingabefeld oben im Fenster (overlay-top, --vvh aus visualViewport); input.focus() direkt im Tipp, sonst öffnet das iPad seine Tastatur nicht. src/keyboard.ts nutzt nur noch die 3D-App
+- Tastenkürzel (src/shortcuts.ts, Editor.keyDown): Strg/Befehl + C V X Z Y, Entf, Pfeile, Esc; aus, solange ein Fenster offen ist oder im Feld getippt wird
 - Seitenverhältnis-Sperre (Schloss) gilt auch fürs Ziehen an den Ecken; aufgehoben = freies Strecken
 - Nichts darf Inhalte überdecken: keine absolut positionierten Tasten über scrollenden Listen (Info-Symbol im Kopfbereich)
 
@@ -68,7 +69,9 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 ## SVG-Export
 - width/height in mm, viewBox in mm
 - Nur Pfade (Text in Pfade umwandeln), keine Bilder, keine Effekte
-- Überlappende Formen gleicher Art vereinen, keine doppelten Schnittlinien
+- Schneiden/Gravieren: jede sichtbare Linie kommt in die Datei (auch Formen in Formen, Überschneidungen); nur genau doppelte Linienstücke entfallen (removeDoubledLines). NICHT vereinen: das hat Löcher und Linien verschluckt (Fehler bis 30.10.2026)
+- Flächengravur: gleiche Art vereinen; Linie ohne Fläche wird als Linie graviert
+- Teile über der Zeichenfläche werden nicht abgeschnitten, der Rahmen wächst mit (exportFrame)
 - Flächengravur nur für geschlossene Formen
 - Dateiname: <Kindname>_<Datum>_<Uhrzeit>.svg
 
@@ -134,7 +137,12 @@ Freihandzeichnungen und exportieren sie als SVG (Teilen-Menü / Download / ZIP).
 
 - Box-Generator (boxgen.ts, boxDialog.ts, box.css): Steckbox mit Fingerzinken; Teile als graphic-Elemente (ref box:<teil>), op cut, locked; Kantenmodell: je Kante Abschnitte mit Rücksprung 0/t (pattern/cubeEdge), Eck-Würfel gehören Vorne/Hinten, Umriss aus panelOutline; Kerf-Ausgleich = Versatz des Umrisses um (Kerf − Passung)/2 nach außen; Passprobe fitTestSheet (Kerf 0,05–0,25); Werte in localStorage laser.box; Numpad hat decimals (2 für Kerf)
 
+- Auswahl (moveOnly): Teile nur antippen/verschieben, keine Griffe, kein Skalieren mit zwei Fingern; bleibt an bis zum erneuten Tippen
+- Messen (measure.ts, measureMode): Linie mit Länge und Abständen, rastet bei Fangen an Ecken/Mitten ein; nur Anzeige, nicht im Export
+- Runde Ecken: worldShape nimmt für roundrect/speech fittedBase(ref, w, h), Radius nach der kürzeren Seite, damit Ecken beim Strecken kreisrund bleiben
+
 ## Stand
+01.11.2026 (Export + Bedienung): Export-Fehler behoben: Formen in Formen und Überlappungen fielen durch unionShapes weg, gerade Linien mit Füllen ebenso, Überstand wurde vom Rahmen abgeschnitten. Tastatur des Geräts statt eigener Tastatur (nur Laser-App), Tastenkürzel, Auswahl-Taste, Messen, runde Ecken beim Skalieren. 352 Tests grün (u. a. Stichprobenvergleich Anzeige/Export der Flächengravur); im Browser durchgespielt, Kopfleiste auf 5 Größen ohne Überdeckung. Nicht auf dem iPad getestet (Tastatur einblenden, Tastenkürzel mit Tablet-Tastatur). Offen: Überlappende Schnittformen werden nicht mehr automatisch verbunden, eine Vereinen-Funktion fehlt.
 30.10.2026 (Box-Generator): Steckbox-Generator (Innen/Außen, Deckel offen/lose/fest, Zinken, Schnittbreite- und Passungs-Ausgleich) mit Passprobe, Eintrag in der Galerie. Tests: auch die 3D-Prüfung (Hülle lückenlos, keine Überschneidung) für alle Deckelarten; 327 Tests grün; im Browser geprüft (Dialog auf 5 Größen, Box und Passprobe erzeugt, SVG-Export 1 roter Pfad). Schnittbreite 0,15 mm ist ein NICHT nachgemessener Startwert; nicht auf dem Laser getestet. Offen: Scharnier/Schiebedeckel, Beschriftung auf Seiten.
 30.10.2026 (Fangen): Objektfang beim Verschieben in der Laser-App mit Führungslinien und Taste Fangen. 311 Tests grün (7 neu), im Browser geprüft (Einrasten am Flächenrand, Linie, aus = frei); linke Leiste bei ca. 768 px Höhe kompakter, 5 Größen ohne Überdeckung. Nicht auf iPad getestet.
 30.10.2026: Laser-App: Objekt sperren (Taste Sperre/Frei, gespeichert) und Hand-Werkzeug (Zoom mit zwei Fingern/Mausrad, Verschieben mit einem Finger). 263 Tests grün, im Browser geprüft (Sperre hält gegen Ziehen, bleibt nach Neuladen, Pinch x3, Verschieben, Mausrad); Layout auf 6 Größen ohne Überdeckung, bei ca. 768 px Höhe kleinere Tasten rechts. Nicht auf iPad getestet (echte Zwei-Finger-Gesten).
