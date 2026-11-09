@@ -173,8 +173,12 @@ export interface FigureCheck {
   outside: boolean;
   /** höher als 30 mm */
   tooTall: boolean;
+  /** Höhe der Figur in mm (höchster Punkt) */
+  height: number;
   /** Überhang mit zu großer Ausladung */
   overhang: boolean;
+  /** größte Ausladung eines zu großen Überhangs in mm (0 = keiner) */
+  reach: number;
   /** Körper, die den zu großen Überhang haben (zum Rotfärben) */
   overhangParts: string[];
   /** Teile hängen nicht zusammen oder schweben */
@@ -196,6 +200,16 @@ export const PROBLEM_TEXT: Record<ProblemKind, string> = {
   thin: 'Eine Stelle ist zu dünn zum Drucken. Mach sie dicker.',
 };
 
+const mm = (v: number): string => String(v).replace('.', ',');
+
+/** Satz zu einem Problem; bei "zu hoch" und "Überhang" mit den gemessenen Zahlen. */
+export function problemText(kind: ProblemKind, c: FigureCheck): string {
+  if (kind === 'tooTall') return `Die Figur ist ${mm(c.height)} mm hoch. Erlaubt sind höchstens ${FIGURE_MAX_HEIGHT} mm mit Sockel. Mach ein Teil niedriger oder setze es tiefer.`;
+  if (kind === 'overhang')
+    return `Ein Teil ragt ${mm(c.reach)} mm in die Luft. Der Drucker schafft nur ${MAX_OVERHANG_REACH} mm ohne Stütze. Mach das Teil kleiner, gib ihm einen breiteren Hals oder setze es tiefer in das Teil darunter.`;
+  return PROBLEM_TEXT[kind];
+}
+
 /** Die Probleme einer Figur in fester Reihenfolge; leer = druckbar. */
 export function figureProblems(c: FigureCheck): ProblemKind[] {
   return (['outside', 'tooTall', 'overhang', 'loose', 'thin'] as const).filter((k) => c[k]);
@@ -211,5 +225,7 @@ export function figureCheck(parts: Part[], model: Pick<FinalModel, 'pos' | 'idx'
   const big = findOverhangs(model).filter((s) => s.reach > MAX_OVERHANG_REACH);
   const overhangParts = [...new Set(big.map((s) => partAt(parts, s.at)).filter((id): id is string => !!id))];
   const overhang = big.length > 0;
-  return { onlyBase, outside, tooTall, overhang, overhangParts, loose, thin, ok: !onlyBase && !outside && !tooTall && !overhang && !loose && !thin };
+  const height = Math.round(Math.max(0, ...model.components.map((c) => c.max[2])) * 10) / 10;
+  const reach = Math.round(Math.max(0, ...big.map((s) => s.reach)) * 10) / 10;
+  return { onlyBase, outside, tooTall, height, overhang, reach, overhangParts, loose, thin, ok: !onlyBase && !outside && !tooTall && !overhang && !loose && !thin };
 }

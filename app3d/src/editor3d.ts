@@ -8,7 +8,7 @@ import { combine } from './csg';
 import { notify, openKindPicker, openProblems, openShapePicker, openSketch, openTextDialog, pickSvg } from './dialogs3d';
 import { createDesign, packDesign, unpackDesign } from './designIO';
 import { busyOverlay, exportParts } from './exportFlow';
-import { BASE_MAX, BASE_MIN, FIGURE_BED, PROBLEM_TEXT, figureCheck, figureProblems, isBase, makeBase, makeFigureKind, maxHeightAt, resizeBase, type FigureCheck } from './figure';
+import { BASE_MAX, BASE_MIN, FIGURE_BED, figureCheck, figureProblems, isBase, makeBase, makeFigureKind, maxHeightAt, problemText, resizeBase, type FigureCheck } from './figure';
 import { History } from './history';
 import { ICONS3D, KIND_ICONS, SPECIAL_ICONS } from './icons3d';
 import { MAX_TEETH, MIN_TEETH } from './shapes3d';
@@ -461,7 +461,7 @@ export class Editor3d {
       if (!c) return notify(ICONS.warn);
       if (c.onlyBase) return void (await openProblems([{ icon: ICONS3D.figure, text: 'Setze zuerst etwas auf den Sockel: einen Körper, eine Form oder einen Buchstaben.' }]));
       const icons = { outside: ICONS3D.bed, tooTall: ICONS3D.height, overhang: ICONS3D.overhang, loose: ICONS3D.loose, thin: ICONS3D.thin };
-      return void (await openProblems(figureProblems(c).map((k) => ({ icon: icons[k], text: PROBLEM_TEXT[k] }))));
+      return void (await openProblems(figureProblems(c).map((k) => ({ icon: icons[k], text: problemText(k, c) }))));
     }
     const out = this.parts.some((p) => !p.hole && isOutside(p, this.bed));
     await openProblems(out ? [{ icon: ICONS3D.bed, text: 'Etwas liegt außerhalb des Druckbetts. Schiebe es zurück oder mach es kleiner.' }] : []);

@@ -13,6 +13,7 @@ import {
   newFigureParts,
   figureProblems,
   PROBLEM_TEXT,
+  problemText,
   resizeBase,
 } from '../app3d/src/figure';
 import { PART_KINDS } from '../app3d/src/mesh';
@@ -204,6 +205,21 @@ describe('Druckprüfung der Figur', () => {
     for (const k of list) expect(PROBLEM_TEXT[k].length).toBeGreaterThan(20);
     const good = await check([...base, onBase(makeFigureKind('cylinder'), base)]);
     expect(figureProblems(good.c)).toEqual([]);
+  });
+
+  it('Sätze nennen die gemessene Höhe und die Ausladung', async () => {
+    const base = newFigureParts();
+    const tall = await check([...base, onBase({ ...makeFigureKind('cylinder'), h: 28 }, base)]); // 3 + 28 = 31
+    expect(tall.c.height).toBe(31);
+    expect(problemText('tooTall', tall.c)).toContain('31 mm hoch');
+    expect(problemText('tooTall', tall.c)).toContain('30 mm');
+    const neck = onBase({ ...makeFigureKind('cylinder'), w: 6, d: 6, h: 8 }, base);
+    const hat = onBase({ ...makeFigureKind('cylinder'), w: 20, d: 20, h: 4 }, [...base, neck]);
+    const wide = await check([...base, neck, hat]);
+    expect(wide.c.reach).toBeGreaterThan(5);
+    expect(problemText('overhang', wide.c)).toContain(`${String(wide.c.reach).replace('.', ',')} mm in die Luft`);
+    expect(problemText('overhang', wide.c)).toContain('5 mm');
+    expect(problemText('thin', wide.c)).toBe(PROBLEM_TEXT.thin);
   });
 
   it('Löcher zählen nicht als Teil der Figur', async () => {
