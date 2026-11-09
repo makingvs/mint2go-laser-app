@@ -823,6 +823,46 @@ input {
   color: #b8730f;
 }
 /* Fenster "Was ist das Problem?" (Antippen des Warnzeichens) */
+/* Tastenkürzel-Liste (Taste ?) */
+.help-panel {
+  width: min(640px, 100%);
+}
+.help-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--m-slate, #4d597c);
+}
+.help-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow-y: auto;
+  min-height: 0;
+}
+.help-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 17px;
+  font-weight: 600;
+}
+.help-row kbd {
+  flex: none;
+  width: 250px;
+  padding: 4px 10px;
+  border-radius: 10px;
+  background: #eef1f8;
+  box-shadow: 0 2px 0 #cfd6e6;
+  font: inherit;
+  font-weight: 800;
+  font-size: 15px;
+  color: #3757a9;
+}
+@media (max-height: 640px) {
+  .help-row { font-size: 14px; }
+  .help-row kbd { width: 220px; font-size: 13px; }
+  .help-list { gap: 3px; }
+}
 .problem-panel {
   width: min(620px, 100%);
   max-height: 100%;
