@@ -139,6 +139,11 @@ export class View3d {
     this.resetView();
   }
 
+  /** Blickrichtung der Kamera (rad, siehe orbit.ts): wichtig für die Pfeiltasten. */
+  get yaw(): number {
+    return this.orbit.yaw;
+  }
+
   resetView(): void {
     this.orbit = defaultOrbit(this.bed);
     this.invalidate();

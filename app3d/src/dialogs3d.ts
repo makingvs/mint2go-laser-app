@@ -11,6 +11,7 @@ import { GLYPH_HEIGHT, textShape } from '../../src/text';
 import { grayFromRGBA, traceGray } from '../../src/trace';
 import { ICONS3D, KIND_ICONS, SPECIAL_ICONS } from './icons3d';
 import type { FigureCheck } from './figure';
+import { SHORTCUT_HELP } from './shortcuts3d';
 import type { PrintCheck } from './printExport';
 import type { ExportFormat } from './storage3d';
 import { KIND_LABELS, PART_KINDS, type PartKind } from './mesh';
@@ -76,6 +77,8 @@ const PAD_W = 120; // Zeichenfläche in "mm" (die Größe wird später im Editor
 const PAD_H = 80;
 const PX = 4; // Pixel pro mm beim Umwandeln in Umrisse
 const LINE_WIDTHS = [4, 8, 14];
+// Spielfigur: die Skizze wird auf ca. 18 mm verkleinert, dünnere Linien wären dann unter 0,8 mm und nicht druckbar
+const FIGURE_LINE_WIDTHS = [8, 12, 16];
 
 interface Stroke {
   pts: Pt[];
@@ -106,15 +109,19 @@ function drawStrokes(ctx: CanvasRenderingContext2D, strokes: Stroke[], scale: nu
   }
 }
 
-/** Freihand-Skizze: Flächen und dicke Linien zeichnen; Ergebnis = alle Striche zu Umrissen vereint (Einheit mm, y nach unten). */
-export function openSketch(): Promise<Shape | null> {
+/**
+ * Freihand-Skizze: Flächen und dicke Linien zeichnen; Ergebnis = alle Striche zu Umrissen vereint (Einheit mm, y nach unten).
+ * `figure` (Spielfigur): nur die dickeren Linien.
+ */
+export function openSketch(figure = false): Promise<Shape | null> {
   return new Promise((resolve) => {
     const o = overlay('overlay-dim');
     const panel = h('div', 'panel sketch-panel');
     const strokes: Stroke[] = [];
     let current: Stroke | null = null;
     let line = false;
-    let width = LINE_WIDTHS[1];
+    const widths = figure ? FIGURE_LINE_WIDTHS : LINE_WIDTHS;
+    let width = widths[1];
 
     const canvas = h('canvas', 'sketch-pad');
     const sizeCanvas = () => {
@@ -214,7 +221,7 @@ export function openSketch(): Promise<Shape | null> {
       tools.append(b);
     };
     addTool(ICONS.roller, false, 0, 'Fläche');
-    LINE_WIDTHS.forEach((w, i) => addTool(dot(3 + i * 3), true, w, 'Linie'));
+    widths.forEach((w, i) => addTool(dot(3 + i * 3), true, w, 'Linie'));
     mark();
 
     const head = h('div', 'panel-head');
@@ -433,6 +440,32 @@ export function openProblems(items: { icon: string; text: string }[]): Promise<v
     o.root.addEventListener('click', (e) => {
       if (e.target === o.root) done();
     });
+  });
+}
+
+/** Liste der Tastenkürzel (Taste ?). Schließt mit Esc, ? oder Antippen außerhalb. */
+export function openShortcutHelp(): void {
+  const o = overlay('overlay-dim');
+  const panel = h('div', 'panel help-panel');
+  const close = () => {
+    document.removeEventListener('keydown', onKey);
+    o.close();
+  };
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape' || e.key === '?') {
+      e.preventDefault();
+      close();
+    }
+  };
+  document.addEventListener('keydown', onKey);
+  const head = h('div', 'panel-head');
+  head.append(h('div', 'help-title', 'Tastenkürzel'), h('div', 'spacer'), button('btn', ICONS.cross, close, 'Schließen'));
+  const list = h('div', 'help-list');
+  for (const s of SHORTCUT_HELP) list.append(h('div', 'help-row', `<kbd>${s.keys}</kbd><span>${s.text}</span>`));
+  panel.append(head, list);
+  o.root.append(panel);
+  o.root.addEventListener('click', (e) => {
+    if (e.target === o.root) close();
   });
 }
 

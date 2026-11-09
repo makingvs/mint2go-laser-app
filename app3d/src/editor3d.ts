@@ -5,7 +5,7 @@ import { formatNumber, openNumpad } from '../../src/numpad';
 import type { Shape } from '../../src/geometry';
 import type { Bed } from './bed';
 import { combine } from './csg';
-import { notify, openKindPicker, openProblems, openShapePicker, openSketch, openTextDialog, pickSvg } from './dialogs3d';
+import { notify, openKindPicker, openProblems, openShapePicker, openShortcutHelp, openSketch, openTextDialog, pickSvg } from './dialogs3d';
 import { createDesign, packDesign, unpackDesign } from './designIO';
 import { busyOverlay, exportParts } from './exportFlow';
 import { BASE_MAX, BASE_MIN, FIGURE_BED, figureCheck, figureProblems, isBase, makeBase, makeFigureKind, maxHeightAt, problemText, resizeBase, type FigureCheck } from './figure';
@@ -21,6 +21,7 @@ import type { PartKind } from './mesh';
 import { MAX_SIZE, MIN_SIZE, applyDim, centered, cloneParts, createPart, findFreeSpot, isOutside, makeGearPart, makeOutlinePart, makeTubePart, newId, type DimField, type OutlineSize, type Part } from './model3d';
 import { buildFinal } from './printExport';
 import { storage, type Design, type ExportFormat, type Profile, type Settings } from './storage3d';
+import { arrowDelta, shortcut3dFor, type Action3d } from './shortcuts3d';
 import { restOn, supportHeight } from './support';
 import { View3d } from './view3d';
 
@@ -72,6 +73,10 @@ export class Editor3d {
   private dimBtns = new Map<DimField, HTMLButtonElement>();
   private tiltPanel: HTMLElement | null = null;
   private tiltStep = 15;
+  /** Zwischenablage für Strg+C / Strg+V */
+  private clip: Part | null = null;
+  private pasteCount = 0;
+  private centerBtn!: HTMLButtonElement;
   /** Spielfigur-Modus: Sockel + Formen/Buchstaben, höchstens 30 mm, Druckprüfung sperrt den Export */
   private fig = false;
   /** Arbeitsfläche der Ansicht (bei der Spielfigur klein, 60 x 60 x 30 mm; sonst das Druckbett) */
@@ -118,7 +123,7 @@ export class Editor3d {
     const textLabel = this.fig ? 'Buchstabe' : 'Text';
     this.railBtn.text = button('btn labeled tool', lab(ICONS.text, textLabel), () => void this.drawText(), textLabel);
     this.railBtn.svg = button('btn labeled tool', lab(ICONS.svgUp, 'SVG'), () => this.drawSvg(), 'SVG-Datei');
-    if (this.fig) rail.append(this.railBtn.body, this.railBtn.shapes, this.railBtn.text);
+    if (this.fig) rail.append(this.railBtn.body, this.railBtn.shapes, this.railBtn.draw, this.railBtn.text);
     else rail.append(this.railBtn.body, h('div', 'rail-sep'), this.railBtn.shapes, this.railBtn.draw, this.railBtn.text, this.railBtn.svg);
 
     // rechte Leiste: Körper umformen
@@ -146,6 +151,7 @@ export class Editor3d {
     this.scheduleFigureCheck();
     // Beim Wechseln der App/Schließen sofort sichern
     document.addEventListener('visibilitychange', this.onHide);
+    document.addEventListener('keydown', this.onKey);
     window.addEventListener('pagehide', this.onHide);
   }
 
@@ -155,6 +161,7 @@ export class Editor3d {
     clearTimeout(this.figTimer);
     this.figSeq += 1;
     document.removeEventListener('visibilitychange', this.onHide);
+    document.removeEventListener('keydown', this.onKey);
     window.removeEventListener('pagehide', this.onHide);
     this.view.destroy();
   }
@@ -214,6 +221,7 @@ export class Editor3d {
       this.refresh();
     }, 'Seitenverhältnis');
     const center = button('dim mitte', `<span class="dim-ico">${ICONS.center}</span><span class="dim-lbl">Mitte</span>`, () => this.centerSelected(), 'In die Mitte');
+    this.centerBtn = center;
     this.dims.insertBefore(this.lockBtn, this.dims.children[3]); // Schloss gehört zu Breite/Tiefe/Höhe
     this.dims.append(center);
     return this.dims;
@@ -344,8 +352,8 @@ export class Editor3d {
   }
 
   private async drawSketch(): Promise<void> {
-    const shape = await openSketch();
-    if (shape) await this.addDrawn(shape, { longest: 50 }, 8, 'sketch');
+    const shape = await openSketch(this.fig);
+    if (shape) await this.addDrawn(shape, { longest: this.fig ? 18 : 50 }, 8, 'sketch'); // Spielfigur: passt auf den Sockel
   }
 
   private async drawText(): Promise<void> {
@@ -375,6 +383,104 @@ export class Editor3d {
     this.refresh();
     const v = await openNumpad({ icon: ICONS.arrowV, value: Math.min(p.h, this.fig ? maxHeightAt(p.z) : p.h), unit: 'mm', min: MIN_SIZE, max: this.fig ? maxHeightAt(p.z) : this.bed.height });
     if (v !== null) this.replace(p.id, applyDim(p, 'h', v, false, this.printer.bed)); // nur die Höhe, nicht gleichmäßig
+    this.commit();
+  }
+
+  // ---------- Tastenkürzel (PC-Tastatur) ----------
+  private onKey = (ev: KeyboardEvent): void => {
+    const t = ev.target as HTMLElement | null;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    if (document.querySelector('.overlay')) return; // Fenster offen (Zahlentastatur, Auswahl, Rückfrage ...)
+    const act = shortcut3dFor(ev);
+    if (!act) return;
+    ev.preventDefault();
+    this.runAction(act, ev.shiftKey);
+  };
+
+  /** Aktion ausführen. Tasten, die es in dieser Ansicht nicht gibt (z. B. Loch bei der Spielfigur) oder die gesperrt sind, tun nichts. */
+  private runAction(a: Action3d, shift: boolean): void {
+    const press = (b: HTMLButtonElement): void => {
+      if (b.isConnected && !b.disabled) b.click();
+    };
+    const p = this.selected();
+    const step = shift ? 10 : 1;
+    switch (a) {
+      case 'undo': return this.undo();
+      case 'redo': return this.redo();
+      case 'copy':
+        if (p && !isBase(p)) {
+          this.clip = cloneParts([p])[0];
+          this.pasteCount = 0;
+        }
+        return;
+      case 'paste': return this.paste();
+      case 'duplicate': return press(this.btn.copy);
+      case 'delete': return press(this.btn.del);
+      case 'deselect': return this.select(null);
+      case 'left':
+      case 'right':
+      case 'up':
+      case 'down': return this.nudge(a, step);
+      case 'raise': return this.setDim('z', step);
+      case 'lower': return this.setDim('z', -step);
+      case 'rotate': return this.setDim('rot', 15);
+      case 'rotateBack': return this.setDim('rot', -15);
+      case 'next': return this.cycle(1);
+      case 'prev': return this.cycle(-1);
+      case 'body': return press(this.railBtn.body);
+      case 'shapes': return press(this.railBtn.shapes);
+      case 'draw': return press(this.railBtn.draw);
+      case 'text': return press(this.railBtn.text);
+      case 'svg': return press(this.railBtn.svg);
+      case 'hole': return press(this.btn.hole);
+      case 'merge': return press(this.btn.merge);
+      case 'tilt': return press(this.railBtn.tilt);
+      case 'mirror': return press(this.railBtn.mirror);
+      case 'align': return press(this.railBtn.align);
+      case 'center': return press(this.centerBtn);
+      case 'home': return this.view.resetView();
+      case 'export': return press(this.btn.export);
+      case 'help': return openShortcutHelp();
+    }
+  }
+
+  /** Pfeiltaste: gewählten Körper um `step` mm verschieben, in Richtung wie im Bild; ein aufliegender Körper fällt auf die neue Auflage. */
+  private nudge(dir: 'left' | 'right' | 'up' | 'down', step: number): void {
+    const p = this.selected();
+    if (!p || isBase(p)) return;
+    const [dx, dy] = arrowDelta(dir, this.view.yaw);
+    const others = this.parts.filter((q) => q.id !== p.id);
+    const resting = !p.hole && Math.abs(p.z - supportHeight(p, others, p)) < 0.05;
+    let next: Part = { ...p, x: p.x + dx * step, y: p.y + dy * step };
+    if (resting) next = { ...next, z: supportHeight(next, others, p) };
+    this.replace(p.id, next);
+    this.commit();
+  }
+
+  /** Anheben/Absenken (z) oder Drehen (rot) um `delta`. Der Sockel bleibt, wo er ist. */
+  private setDim(field: 'z' | 'rot', delta: number): void {
+    const p = this.selected();
+    if (!p || isBase(p)) return;
+    this.replace(p.id, applyDim(p, field, p[field] + delta, this.lock, this.bed));
+    this.commit();
+  }
+
+  /** Tab: den nächsten (oder vorherigen) Körper wählen. */
+  private cycle(dir: 1 | -1): void {
+    const n = this.parts.length;
+    if (!n) return;
+    const i = this.parts.findIndex((q) => q.id === this.selectedId);
+    this.select(this.parts[i < 0 ? (dir > 0 ? 0 : n - 1) : (i + dir + n) % n].id);
+  }
+
+  /** Strg+V: Kopie des mit Strg+C gemerkten Körpers, jedes Mal etwas weiter versetzt. */
+  private paste(): void {
+    if (!this.clip) return;
+    this.pasteCount += 1;
+    const off = 10 * this.pasteCount;
+    const c: Part = { ...cloneParts([this.clip])[0], id: newId(), x: this.clip.x + off, y: this.clip.y - off };
+    this.parts = [...this.parts, c];
+    this.selectedId = c.id;
     this.commit();
   }
 
