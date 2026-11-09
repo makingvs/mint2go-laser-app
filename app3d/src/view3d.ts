@@ -92,6 +92,8 @@ export class View3d {
   private bed: Bed;
   private parts: Part[] = [];
   private selectedId: string | null = null;
+  private fixed = new Set<string>(); // gesperrte Körper (Sockel der Spielfigur): wählbar, aber ohne Griffe und nicht verschiebbar
+  private tapFixed: string | null = null; // gesperrter Körper unter dem Finger: wird erst beim Antippen (ohne Ziehen) gewählt
   private lock = true;
   private pointers = new Map<number, { x: number; y: number }>();
   private drag: Drag | null = null;
@@ -139,6 +141,12 @@ export class View3d {
 
   resetView(): void {
     this.orbit = defaultOrbit(this.bed);
+    this.invalidate();
+  }
+
+  /** Körper sperren: keine Griffe, kein Verschieben (Antippen wählt sie trotzdem, Ziehen dreht die Ansicht). */
+  setFixed(ids: Set<string>): void {
+    this.fixed = ids;
     this.invalidate();
   }
 
@@ -330,8 +338,8 @@ export class View3d {
   /** Griffe an den gewählten Körper setzen. Größe und Abstand in Pixeln bleiben immer gleich (auch bei kleinen Körpern und beim Zoomen). */
   private placeHandles(): void {
     const p = this.parts.find((q) => q.id === this.selectedId);
-    this.handles.visible = !!p;
-    if (!p) return;
+    this.handles.visible = !!p && !this.fixed.has(p.id);
+    if (!p || !this.handles.visible) return;
     const camPos = this.camera.position;
     const pxToWorld = (at: THREE.Vector3): number => {
       const dist = camPos.distanceTo(at);
@@ -435,11 +443,17 @@ export class View3d {
     }
     this.moved = 0;
     this.camMode = false;
+    this.tapFixed = null;
     this.setRay(e.clientX, e.clientY);
     const handle = this.pickHandle();
     const sel = this.parts.find((p) => p.id === this.selectedId);
     if (handle && sel) return this.beginDrag(handle, sel, e);
     const id = this.pickPart();
+    if (id && this.fixed.has(id) && !e.shiftKey && (e.buttons & 2) === 0) {
+      this.tapFixed = id;
+      this.camMode = true;
+      return;
+    }
     if (id && !e.shiftKey && (e.buttons & 2) === 0) {
       this.hooks.select(id);
       const p = this.parts.find((q) => q.id === id);
@@ -531,7 +545,8 @@ export class View3d {
     this.pointers.delete(e.pointerId);
     if (this.drag) this.endDrag();
     // Antippen der leeren Fläche (ohne Ziehen) wählt ab
-    if (wasSingle && this.camMode && this.moved < 6 && e.type === 'pointerup') this.hooks.select(null);
+    if (wasSingle && this.camMode && this.moved < 6 && e.type === 'pointerup') this.hooks.select(this.tapFixed);
+    this.tapFixed = null;
     if (this.pointers.size === 0) this.camMode = false;
   };
 

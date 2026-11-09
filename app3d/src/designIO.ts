@@ -1,5 +1,6 @@
 // Arbeit <-> gespeicherte Form: Körper vom Typ 'mesh' haben ihr Netz im Speicher (meshStore.ts);
 // beim Speichern wandert das Netz in die Arbeit, beim Laden wieder zurück in den Speicher.
+import { figureCheck, newFigureParts } from './figure';
 import { zipDesignNames } from './names3d';
 import { getMesh, putMesh } from './meshStore';
 import { cloneParts, newId, type Part } from './model3d';
@@ -14,14 +15,19 @@ export function createDesign(): Design {
 }
 
 /** Arbeit zum Speichern zusammenstellen (nur die Netze, die die Körper wirklich brauchen). */
-export function packDesign(base: Pick<Design, 'id' | 'created' | 'thumb' | 'guide'>, parts: Part[], now = Date.now()): Design {
+export function packDesign(base: Pick<Design, 'id' | 'created' | 'thumb' | 'guide' | 'figure'>, parts: Part[], now = Date.now()): Design {
   const meshes: Record<string, StoredMesh> = {};
   for (const p of parts) {
     if (p.kind !== 'mesh' || !p.meshId || meshes[p.meshId]) continue;
     const m = getMesh(p.meshId);
     if (m) meshes[p.meshId] = { pos: Float32Array.from(m.pos), idx: Uint32Array.from(m.idx) };
   }
-  return { id: base.id, created: base.created, updated: now, parts: cloneParts(parts), meshes, thumb: base.thumb, ...(base.guide ? { guide: base.guide } : {}) };
+  return { id: base.id, created: base.created, updated: now, parts: cloneParts(parts), meshes, thumb: base.thumb, ...(base.guide ? { guide: base.guide } : {}), ...(base.figure ? { figure: true as const } : {}) };
+}
+
+/** Neue Spielfigur: nur der Sockel. */
+export function createFigureDesign(): Design {
+  return { ...createDesign(), parts: newFigureParts(), figure: true };
 }
 
 /** Gespeicherte Arbeit öffnen: Netze zurück in den Speicher, Körper liefern. */
@@ -32,7 +38,8 @@ export function unpackDesign(d: Design): Part[] {
 
 /**
  * ZIP mit je einem Ordner pro Kind: <Kind>/<Kind>_<Datum>_<Uhrzeit>.stl (oder .3mf).
- * Arbeiten ohne druckbaren Inhalt (leer, nur Löcher, fehlerhaftes Netz) werden übersprungen.
+ * Arbeiten ohne druckbaren Inhalt (leer, nur Löcher, fehlerhaftes Netz) werden übersprungen,
+ * ebenso Spielfiguren, die die Druckprüfung nicht bestehen (zu hoch, Überhang, lose Teile ...).
  */
 export async function buildZip3d(
   designs: (Design & { profile: string })[],
@@ -43,8 +50,10 @@ export async function buildZip3d(
   const items: { folder: string; when: Date; data: Uint8Array }[] = [];
   const shift = bedCorner(printer.bed);
   for (const d of designs) {
-    const model = await buildFinal(unpackDesign(d)).catch(() => 'error' as const);
+    const parts = unpackDesign(d);
+    const model = await buildFinal(parts).catch(() => 'error' as const);
     if (!model || model === 'error') continue;
+    if (d.figure && !figureCheck(parts, model, printer.nozzle).ok) continue;
     items.push({
       folder: profiles.find((p) => p.id === d.profile)?.name ?? d.profile,
       when: new Date(d.updated || d.created || Date.now()),

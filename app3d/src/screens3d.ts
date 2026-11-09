@@ -108,6 +108,7 @@ export function galleryScreen(
   onBack: () => void,
   onOpen: (d: Design | null) => void,
   onWerkstatt?: () => void,
+  onFigure?: () => void,
 ): void {
   root.innerHTML = '';
   const screen = h('div', 'screen gallery-screen');
@@ -144,6 +145,7 @@ export function galleryScreen(
       grid.innerHTML = '';
       grid.append(button('card add-card wide', ICONS.plus, () => onOpen(null), 'Neu'));
       if (onWerkstatt) grid.append(button('card werk-entry wide', '<span class="emoji">🛠️</span><span class="cap">3D-Werkstatt</span>', onWerkstatt, '3D-Werkstatt'));
+      if (onFigure) grid.append(button('card werk-entry wide', '<span class="emoji">♟️</span><span class="cap">Spielfigur</span>', onFigure, 'Spielfigur'));
       for (const d of list) {
         const card = h('div', 'card work-card');
         const thumb = d.thumb ? `<img class="thumb" src="${d.thumb}" alt="" draggable="false">` : `<span class="thumb thumb-empty">${KIND_ICONS.box}</span>`;
@@ -159,8 +161,9 @@ export function galleryScreen(
         }, 'Löschen');
         const exp = button('work-export', ICONS.download, async () => {
           if (!d.parts.length) return shake(exp);
-          await exportParts(unpackDesign(d), settings, settings.format);
+          await exportParts(unpackDesign(d), settings, settings.format, !!d.figure);
         }, 'Exportieren');
+        if (d.figure) card.append(h('div', 'work-badge', '♟️'));
         if (d.guide) card.append(h('div', 'work-badge' + (d.guide.done ? ' done' : ''), `${d.guide.done ? '⭐' : '🛠️'} ${projectByNumber(d.guide.project)?.emoji ?? d.guide.project}`));
         const actions = h('div', 'work-actions');
         actions.append(exp, del);

@@ -28,6 +28,10 @@ export const ICONS3D = {
   home: svg('<path d="M3 11 12 3l9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/>'),
   tilt: svg('<path d="M7 17 5 9l8-2 2 8z" fill="currentColor" fill-opacity=".14"/><path d="M4 20h16"/>'),
   mirror: svg('<path d="M12 3v18" stroke-dasharray="2.5 2.5"/><path d="M9 7 4 17h5zM15 7l5 10h-5z" fill="currentColor" fill-opacity=".14"/>'),
+  height: svg('<path d="M4 4h16"/><path d="M12 8v12M8.500 17 12 20.500 15.500 17M8.500 11 12 7.500 15.500 11"/>'),
+  overhang: svg('<path d="M10 21v-8M14 21v-8"/><path d="M3 13h18l-2-6H5z" fill="currentColor" fill-opacity=".14"/>'),
+  loose: svg('<rect x="3" y="13" width="9" height="8" rx="1.500" fill="currentColor" fill-opacity=".14"/><rect x="12" y="3" width="9" height="8" rx="1.500" stroke-dasharray="2.500 2.500"/>'),
+  figure: svg('<circle cx="12" cy="7" r="3.500" fill="currentColor" fill-opacity=".14"/><path d="M8 17c0-4 1.500-6 4-6s4 2 4 6z" fill="currentColor" fill-opacity=".14"/><ellipse cx="12" cy="19.500" rx="8" ry="2"/>'),
   align: svg('<path d="M12 3v18"/><rect x="4.5" y="6" width="15" height="4" rx="1"/><rect x="8" y="14" width="8" height="4" rx="1"/>'),
 };
 

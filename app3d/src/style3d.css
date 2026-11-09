@@ -818,6 +818,12 @@ input {
   box-shadow: 0 0 0 3px var(--m-orange) inset;
   color: #b8730f;
 }
+/* Spielfigur: solange etwas nicht passt, ist der Haken gesperrt */
+.export-panel .btn.send:disabled {
+  opacity: 0.35;
+  filter: grayscale(0.8);
+  box-shadow: none;
+}
 .chk-ico {
   width: 56px;
   height: 56px;

@@ -38,6 +38,8 @@ export interface Design {
   thumb?: string;
   /** Fortschritt in der 3D-Werkstatt (nur bei Arbeiten, die aus einem Projekt entstanden sind) */
   guide?: GuideState;
+  /** Spielfigur (Sockel + Formen, höchstens 30 mm; siehe figure.ts); der Export prüft Höhe, Überhang und Zusammenhalt */
+  figure?: true;
 }
 
 export type StoredDesign = Design & { profile: string };
