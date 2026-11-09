@@ -3,10 +3,12 @@ import { button, confirmDialog, h, lab } from '../../src/dom';
 import { ICONS } from '../../src/icons';
 import { formatNumber, openNumpad } from '../../src/numpad';
 import type { Shape } from '../../src/geometry';
+import type { Bed } from './bed';
 import { combine } from './csg';
-import { notify, openKindPicker, openShapePicker, openSketch, openTextDialog, pickSvg } from './dialogs3d';
+import { notify, openKindPicker, openProblems, openShapePicker, openSketch, openTextDialog, pickSvg } from './dialogs3d';
 import { createDesign, packDesign, unpackDesign } from './designIO';
 import { busyOverlay, exportParts } from './exportFlow';
+import { BASE_MAX, BASE_MIN, FIGURE_BED, PROBLEM_TEXT, figureCheck, figureProblems, isBase, makeBase, makeFigureKind, maxHeightAt, resizeBase, type FigureCheck } from './figure';
 import { History } from './history';
 import { ICONS3D, KIND_ICONS, SPECIAL_ICONS } from './icons3d';
 import { MAX_TEETH, MIN_TEETH } from './shapes3d';
@@ -17,6 +19,7 @@ import type { GuideState, Highlight, Snapshot } from './werkstatt/engine3d';
 import { projectByNumber } from './werkstatt/projects3d';
 import type { PartKind } from './mesh';
 import { MAX_SIZE, MIN_SIZE, applyDim, centered, cloneParts, createPart, findFreeSpot, isOutside, makeGearPart, makeOutlinePart, makeTubePart, newId, type DimField, type OutlineSize, type Part } from './model3d';
+import { buildFinal } from './printExport';
 import { storage, type Design, type ExportFormat, type Profile, type Settings } from './storage3d';
 import { restOn, supportHeight } from './support';
 import { View3d } from './view3d';
@@ -59,7 +62,7 @@ export class Editor3d {
   private dimEls = new Map<DimField, HTMLElement>();
   private dims!: HTMLElement;
   private lockBtn!: HTMLButtonElement;
-  private status!: HTMLElement;
+  private status!: HTMLButtonElement;
   private stage!: HTMLElement;
   private coach: Coach | null = null;
   private exported = false;
@@ -69,6 +72,13 @@ export class Editor3d {
   private dimBtns = new Map<DimField, HTMLButtonElement>();
   private tiltPanel: HTMLElement | null = null;
   private tiltStep = 15;
+  /** Spielfigur-Modus: Sockel + Formen/Buchstaben, höchstens 30 mm, Druckprüfung sperrt den Export */
+  private fig = false;
+  /** Arbeitsfläche der Ansicht (bei der Spielfigur klein, 60 x 60 x 30 mm; sonst das Druckbett) */
+  private bed: Bed;
+  private figCheck: FigureCheck | null = null;
+  private figTimer: number | undefined;
+  private figSeq = 0;
 
   constructor(private o: EditorOptions) {
     this.printer = o.settings;
@@ -76,6 +86,9 @@ export class Editor3d {
     this.design = o.design ?? createDesign();
     this.everSaved = !!o.design;
     this.parts = unpackDesign(this.design);
+    this.fig = !!this.design.figure;
+    this.bed = this.fig ? FIGURE_BED : this.printer.bed;
+    if (this.fig && !this.parts.some(isBase)) this.parts = [makeBase(), ...this.parts];
     this.history = new History<Part[]>(this.parts);
     const top = h('div', 'topbar');
     const back = button('btn labeled', lab(ICONS.gallery, 'Galerie'), () => void this.exit(), 'Galerie');
@@ -86,7 +99,7 @@ export class Editor3d {
     this.btn.hole = button('btn labeled', lab(ICONS3D.hole, 'Loch'), () => this.toggleHole(), 'Loch');
     this.btn.merge = button('btn labeled', lab(ICONS3D.merge, 'Vereinen'), () => void this.merge(), 'Vereinen');
     this.btn.export = button('btn send labeled', lab(ICONS.share, 'Export'), () => void this.exportModel(), 'Exportieren');
-    this.status = h('div', 'status', ICONS.warn);
+    this.status = button('status', ICONS.warn, () => void this.showProblems(), 'Was ist das Problem?');
     const home = button('btn labeled', lab(ICONS3D.home, 'Ansicht'), () => this.view.resetView(), 'Ansicht zurücksetzen');
     const group = h('div', 'top-group');
     group.append(this.btn.undo, this.btn.redo, this.btn.copy, this.btn.del);
@@ -94,7 +107,7 @@ export class Editor3d {
     groupCombine.append(this.btn.hole, this.btn.merge);
     const group2 = h('div', 'top-group');
     group2.append(this.status, home, this.btn.export);
-    top.append(back, h('div', 'top-center'), groupCombine, group, group2);
+    top.append(back, h('div', 'top-center'), ...(this.fig ? [] : [groupCombine]), group, group2);
 
     const body = h('div', 'editor-body');
     const rail = h('div', 'rail left-rail');
@@ -102,9 +115,11 @@ export class Editor3d {
     this.railBtn.body = button('btn labeled tool', lab(KIND_ICONS.box, 'Körper'), () => void this.pickKind(), 'Körper');
     this.railBtn.shapes = button('btn labeled tool', lab(ICONS.shapes, 'Formen'), () => void this.drawShape(), 'Formen');
     this.railBtn.draw = button('btn labeled tool', lab(ICONS.draw, 'Freihand'), () => void this.drawSketch(), 'Freihand');
-    this.railBtn.text = button('btn labeled tool', lab(ICONS.text, 'Text'), () => void this.drawText(), 'Text');
+    const textLabel = this.fig ? 'Buchstabe' : 'Text';
+    this.railBtn.text = button('btn labeled tool', lab(ICONS.text, textLabel), () => void this.drawText(), textLabel);
     this.railBtn.svg = button('btn labeled tool', lab(ICONS.svgUp, 'SVG'), () => this.drawSvg(), 'SVG-Datei');
-    rail.append(this.railBtn.body, h('div', 'rail-sep'), this.railBtn.shapes, this.railBtn.draw, this.railBtn.text, this.railBtn.svg);
+    if (this.fig) rail.append(this.railBtn.body, this.railBtn.shapes, this.railBtn.text);
+    else rail.append(this.railBtn.body, h('div', 'rail-sep'), this.railBtn.shapes, this.railBtn.draw, this.railBtn.text, this.railBtn.svg);
 
     // rechte Leiste: Körper umformen
     const right = h('div', 'rail right-rail');
@@ -117,16 +132,18 @@ export class Editor3d {
     this.stage = stage;
     const host = h('div', 'view-host');
     stage.append(host, this.buildDims());
-    body.append(rail, stage, right);
+    body.append(rail, stage, ...(this.fig ? [] : [right]));
     this.root.append(top, body);
 
-    this.view = new View3d(host, this.printer.bed, {
+    this.view = new View3d(host, this.bed, {
       select: (id) => this.select(id),
       update: (id, next) => this.replace(id, next),
       commit: () => this.commit(),
     });
+    if (this.fig) this.view.setFixed(new Set(this.parts.filter(isBase).map((p) => p.id))); // Sockel: keine Griffe, nicht verschiebbar
     this.refresh();
     this.startGuide();
+    this.scheduleFigureCheck();
     // Beim Wechseln der App/Schließen sofort sichern
     document.addEventListener('visibilitychange', this.onHide);
     window.addEventListener('pagehide', this.onHide);
@@ -135,6 +152,8 @@ export class Editor3d {
   destroy(): void {
     this.coach?.destroy();
     clearTimeout(this.saveTimer);
+    clearTimeout(this.figTimer);
+    this.figSeq += 1;
     document.removeEventListener('visibilitychange', this.onHide);
     window.removeEventListener('pagehide', this.onHide);
     this.view.destroy();
@@ -163,7 +182,7 @@ export class Editor3d {
       this.dirty = false;
       try {
         const thumb = this.view.snapshot() ?? undefined;
-        this.design = packDesign({ id: this.design.id, created: this.design.created, thumb, guide: this.design.guide }, this.parts);
+        this.design = packDesign({ id: this.design.id, created: this.design.created, thumb, guide: this.design.guide, figure: this.design.figure }, this.parts);
         await storage.saveDesign(this.o.profile.id, this.design);
         this.everSaved = true;
       } catch {
@@ -204,10 +223,20 @@ export class Editor3d {
     const p = this.selected();
     if (!p) return;
     const meta = DIMS.find((d) => d.field === field)!;
-    const range = field === 'rot' ? [0, 359.9] : field === 'z' ? [0, this.printer.bed.height] : [MIN_SIZE, MAX_SIZE];
+    if (isBase(p)) {
+      // Sockel: nur der Durchmesser (bleibt rund)
+      if (field !== 'w' && field !== 'd') return;
+      const dia = await openNumpad({ icon: meta.icon, value: p.w, unit: 'mm', min: BASE_MIN, max: BASE_MAX });
+      if (dia === null) return;
+      this.replace(p.id, resizeBase(p, dia));
+      this.commit();
+      return;
+    }
+    const top = this.fig ? (field === 'h' ? maxHeightAt(p.z) : this.bed.width) : MAX_SIZE; // Spielfigur: höchstens 30 mm hoch, nicht breiter als die Fläche
+    const range = field === 'rot' ? [0, 359.9] : field === 'z' ? [0, this.bed.height] : [MIN_SIZE, top];
     const v = await openNumpad({ icon: meta.icon, value: p[field], unit: meta.unit, min: range[0], max: range[1] });
     if (v === null) return;
-    this.replace(p.id, applyDim(p, field, v, this.lock, this.printer.bed));
+    this.replace(p.id, applyDim(p, field, v, this.lock, this.bed));
     this.commit();
   }
 
@@ -231,9 +260,11 @@ export class Editor3d {
     this.history.commit(this.parts);
     this.refresh();
     this.scheduleSave();
+    this.scheduleFigureCheck();
   }
 
   private add(kind: PartKind): void {
+    if (this.fig) return this.placeOnBase(makeFigureKind(kind));
     const spot = findFreeSpot(kind, this.parts, this.printer.bed);
     const p = createPart(kind, spot.x, spot.y);
     this.parts = [...this.parts, p];
@@ -266,7 +297,7 @@ export class Editor3d {
   // ---------- Exportieren ----------
   /** Druckprüfung zeigen, Dateiart wählen, Dateiname vom Kind tippen lassen, speichern (STL/3MF). */
   private async exportModel(): Promise<void> {
-    const f = await exportParts(this.parts, this.printer, this.format);
+    const f = await exportParts(this.parts, this.printer, this.format, this.fig);
     if (f) {
       this.format = f;
       this.exported = true; // für die Werkstatt: abgeschickt
@@ -275,12 +306,26 @@ export class Editor3d {
   }
 
   private async pickKind(): Promise<void> {
-    const kind = await openKindPicker();
+    const kind = await openKindPicker(this.fig);
     if (kind === 'tube') this.addSpecial(makeTubePart(this.printer.bed, 24, 60));
     else if (kind === 'gear') {
       const n = await openNumpad({ icon: SPECIAL_ICONS.gear, value: 10, unit: 'Zähne', min: MIN_TEETH, max: MAX_TEETH });
       if (n !== null) this.addSpecial(makeGearPart(n, 5, this.printer.bed));
     } else if (kind) this.add(kind);
+  }
+
+  /** Neuen Körper über die Mitte halten und fallen lassen: er landet auf dem Höchsten, was dort steht (auch auf einem hohen Körper). */
+  private dropOnto(part: Part): Part {
+    return restOn({ ...part, x: 0, y: 0, z: this.bed.height }, this.parts);
+  }
+
+  /** Spielfigur: Körper in die Mitte des Sockels setzen; er fällt auf das, was dort unter ihm ist (Sockel, Körper darunter). */
+  private placeOnBase(part: Part): void {
+    const rest = this.dropOnto(part);
+    const p = { ...rest, h: Math.min(rest.h, maxHeightAt(rest.z)) };
+    this.parts = [...this.parts, p];
+    this.selectedId = p.id;
+    this.commit();
   }
 
   /** Röhre oder Zahnrad auf einen freien Platz setzen. */
@@ -295,7 +340,7 @@ export class Editor3d {
   // ---------- Zeichnen: Umriss -> Körper mit Höhe ----------
   private async drawShape(): Promise<void> {
     const r = await openShapePicker();
-    if (r) await this.addDrawn(r.shape, { longest: 40 }, 10, `shape:${r.id}`);
+    if (r) await this.addDrawn(r.shape, { longest: this.fig ? 14 : 40 }, this.fig ? 8 : 10, `shape:${r.id}`);
   }
 
   private async drawSketch(): Promise<void> {
@@ -304,8 +349,8 @@ export class Editor3d {
   }
 
   private async drawText(): Promise<void> {
-    const r = await openTextDialog();
-    if (r) await this.addDrawn(r.shape, { scale: r.scale }, 5, 'text');
+    const r = await openTextDialog(this.fig); // Spielfigur: ein einzelner Buchstabe
+    if (r) await this.addDrawn(r.shape, { scale: r.scale }, this.fig ? 8 : 5, 'text');
   }
 
   private drawSvg(): void {
@@ -317,14 +362,18 @@ export class Editor3d {
 
   /** Umriss als Körper auf freien Platz setzen, dann nach der Höhe fragen (Abbrechen behält die Starthöhe). */
   private async addDrawn(shape: Shape, size: OutlineSize, height: number, tag?: string): Promise<void> {
-    const probe = makeOutlinePart(shape, size, height, this.printer.bed, 0, 0, tag);
+    const probe = makeOutlinePart(shape, size, height, this.bed, 0, 0, tag);
     if (!probe) return notify(ICONS.warn);
-    const spot = findFreeSpot(probe, this.parts, this.printer.bed);
-    const p = { ...probe, x: spot.x, y: spot.y };
+    let p: Part;
+    if (this.fig) p = this.dropOnto(probe); // Spielfigur: Mitte des Sockels
+    else {
+      const spot = findFreeSpot(probe, this.parts, this.printer.bed);
+      p = { ...probe, x: spot.x, y: spot.y };
+    }
     this.parts = [...this.parts, p];
     this.selectedId = p.id;
     this.refresh();
-    const v = await openNumpad({ icon: ICONS.arrowV, value: p.h, unit: 'mm', min: MIN_SIZE, max: this.printer.bed.height });
+    const v = await openNumpad({ icon: ICONS.arrowV, value: Math.min(p.h, this.fig ? maxHeightAt(p.z) : p.h), unit: 'mm', min: MIN_SIZE, max: this.fig ? maxHeightAt(p.z) : this.bed.height });
     if (v !== null) this.replace(p.id, applyDim(p, 'h', v, false, this.printer.bed)); // nur die Höhe, nicht gleichmäßig
     this.commit();
   }
@@ -344,7 +393,7 @@ export class Editor3d {
 
   private async remove(): Promise<void> {
     const p = this.selected();
-    if (!p || !(await confirmDialog(ICONS.trash))) return;
+    if (!p || isBase(p) || !(await confirmDialog(ICONS.trash))) return;
     this.parts = this.parts.filter((q) => q.id !== p.id);
     this.selectedId = null;
     this.commit();
@@ -367,6 +416,7 @@ export class Editor3d {
     if (!this.selected()) this.selectedId = null;
     this.refresh();
     this.scheduleSave();
+    this.scheduleFigureCheck();
   }
 
   private undo(): void {
@@ -378,24 +428,60 @@ export class Editor3d {
   }
 
   private refresh(): void {
-    const outside = new Set(this.parts.filter((p) => !p.hole && isOutside(p, this.printer.bed)).map((p) => p.id)); // Löcher werden nicht gedruckt
+    const outside = new Set(this.parts.filter((p) => !p.hole && isOutside(p, this.bed)).map((p) => p.id)); // Löcher werden nicht gedruckt
+    const wrong = this.figCheck && !this.figCheck.ok && !this.figCheck.onlyBase;
+    for (const id of this.figCheck?.overhangParts ?? []) outside.add(id); // Spielfigur: Körper mit zu großem Überhang rot
     this.view.setParts(this.parts, this.selectedId, outside);
     const sel = this.selected();
+    const base = !!sel && isBase(sel);
     this.dims.classList.toggle('off', !sel);
+    for (const [f, b] of this.dimBtns) b.disabled = base && f !== 'w' && f !== 'd'; // Sockel: nur der Durchmesser
     for (const d of DIMS) this.dimEls.get(d.field)!.textContent = sel ? formatNumber(sel[d.field]) : '–';
     this.lockBtn.classList.toggle('active', this.lock);
     this.lockBtn.innerHTML = this.lock ? ICONS.lock : ICONS.unlock;
     this.btn.undo.disabled = !this.history.canUndo;
     this.btn.redo.disabled = !this.history.canRedo;
-    this.btn.copy.disabled = !sel;
-    this.btn.del.disabled = !sel;
+    this.btn.copy.disabled = !sel || base;
+    this.btn.del.disabled = !sel || base;
     this.btn.hole.disabled = !sel;
     this.btn.hole.classList.toggle('active', !!sel?.hole);
     this.btn.merge.disabled = !sel;
     for (const k of ['tilt', 'mirror', 'align'] as const) this.railBtn[k].disabled = !sel;
     if (!sel && this.tiltPanel) this.closeTilt();
-    this.status.classList.toggle('bad', outside.size > 0);
+    this.status.classList.toggle('bad', outside.size > 0 || !!wrong);
     this.coach?.update();
+  }
+
+  /** Auf das Warnzeichen getippt: erklären, was nicht passt (Spielfigur: alle Prüfungen, sonst nur "außerhalb"). */
+  private async showProblems(): Promise<void> {
+    if (this.fig) {
+      clearTimeout(this.figTimer);
+      await this.runFigureCheck(); // aktuellen Stand prüfen
+      const c = this.figCheck;
+      if (!c) return notify(ICONS.warn);
+      if (c.onlyBase) return void (await openProblems([{ icon: ICONS3D.figure, text: 'Setze zuerst etwas auf den Sockel: einen Körper, eine Form oder einen Buchstaben.' }]));
+      const icons = { outside: ICONS3D.bed, tooTall: ICONS3D.height, overhang: ICONS3D.overhang, loose: ICONS3D.loose, thin: ICONS3D.thin };
+      return void (await openProblems(figureProblems(c).map((k) => ({ icon: icons[k], text: PROBLEM_TEXT[k] }))));
+    }
+    const out = this.parts.some((p) => !p.hole && isOutside(p, this.bed));
+    await openProblems(out ? [{ icon: ICONS3D.bed, text: 'Etwas liegt außerhalb des Druckbetts. Schiebe es zurück oder mach es kleiner.' }] : []);
+  }
+
+  // ---------- Spielfigur: laufende Druckprüfung ----------
+  /** Kurz nach jeder Änderung prüfen (Höhe, Überhang, lose Teile ...): Warnzeichen oben, Körper mit Überhang werden rot. */
+  private scheduleFigureCheck(): void {
+    if (!this.fig) return;
+    clearTimeout(this.figTimer);
+    this.figTimer = window.setTimeout(() => void this.runFigureCheck(), 400);
+  }
+
+  private async runFigureCheck(): Promise<void> {
+    const seq = ++this.figSeq;
+    const parts = this.parts;
+    const model = await buildFinal(parts).catch(() => 'error' as const);
+    if (seq !== this.figSeq) return; // inzwischen geändert
+    this.figCheck = model && model !== 'error' ? figureCheck(parts, model, this.printer.nozzle) : null;
+    this.refresh();
   }
 
   // ---------- Umformen: Kippen, Spiegeln, Ausrichten ----------

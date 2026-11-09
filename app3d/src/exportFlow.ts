@@ -5,6 +5,7 @@ import { saveFile } from '../../src/exporter';
 import { ICONS } from '../../src/icons';
 import { openSaveDialog } from '../../src/saveDialog';
 import type { PrinterSettings } from './bed';
+import { figureCheck } from './figure';
 import { notify, openExportPanel } from './dialogs3d';
 import type { Part } from './model3d';
 import { bedCorner, buildFinal, printCheck, shareMime, to3mf, toStl } from './printExport';
@@ -17,16 +18,19 @@ export function busyOverlay(): { close: () => void } {
   return o;
 }
 
-/** Liefert die gewählte Dateiart (zum Merken) oder null, wenn nichts exportiert wurde. */
-export async function exportParts(parts: Part[], printer: PrinterSettings, format: ExportFormat): Promise<ExportFormat | null> {
+/**
+ * Liefert die gewählte Dateiart (zum Merken) oder null, wenn nichts exportiert wurde.
+ * `figure`: Spielfigur – die Prüfung (30 mm, Überhang, lose Teile ...) sperrt den Export, bis alles in Ordnung ist.
+ */
+export async function exportParts(parts: Part[], printer: PrinterSettings, format: ExportFormat, figure = false): Promise<ExportFormat | null> {
   const busy = busyOverlay();
   const model = await buildFinal(parts).catch(() => 'error' as const);
   busy.close();
-  if (!model || model === 'error') {
+  if (!model || model === 'error' || (figure && figureCheck(parts, model, printer.nozzle).onlyBase)) {
     notify(ICONS.warn); // nichts zu drucken oder ein Körper ist nicht in Ordnung
     return null;
   }
-  const fmt = await openExportPanel(printCheck(parts, model, printer.bed, printer.nozzle), format);
+  const fmt = await openExportPanel(printCheck(parts, model, printer.bed, printer.nozzle), format, figure ? figureCheck(parts, model, printer.nozzle) : undefined);
   if (!fmt) return null;
   const shift = bedCorner(printer.bed);
   openSaveDialog({

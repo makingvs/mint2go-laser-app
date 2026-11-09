@@ -2,7 +2,7 @@ import '@fontsource-variable/jost';
 import './shared.css';
 import '../../src/guided/guided.css';
 import './style3d.css';
-import { createDesign } from './designIO';
+import { createDesign, createFigureDesign } from './designIO';
 import { Editor3d } from './editor3d';
 import { galleryScreen, profileScreen } from './screens3d';
 import { DEFAULT_SETTINGS, storage, type Design, type Profile, type Settings } from './storage3d';
@@ -43,7 +43,7 @@ async function showGallery(profile: Profile): Promise<void> {
   if (updatePending) return location.reload();
   leaveEditor();
   settings = await storage.getSettings();
-  galleryScreen(app, profile, settings, () => void showProfiles(), (d) => openEditor(profile, d), () => void showWerkstatt(profile));
+  galleryScreen(app, profile, settings, () => void showProfiles(), (d) => openEditor(profile, d), () => void showWerkstatt(profile), () => openEditor(profile, createFigureDesign()));
 }
 
 /** 3D-Werkstatt: geführte Projekte */

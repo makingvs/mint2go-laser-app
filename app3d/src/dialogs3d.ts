@@ -10,6 +10,7 @@ import { svgToShape } from '../../src/svgImport';
 import { GLYPH_HEIGHT, textShape } from '../../src/text';
 import { grayFromRGBA, traceGray } from '../../src/trace';
 import { ICONS3D, KIND_ICONS, SPECIAL_ICONS } from './icons3d';
+import type { FigureCheck } from './figure';
 import type { PrintCheck } from './printExport';
 import type { ExportFormat } from './storage3d';
 import { KIND_LABELS, PART_KINDS, type PartKind } from './mesh';
@@ -19,7 +20,7 @@ import { KIND_LABELS, PART_KINDS, type PartKind } from './mesh';
 export type SpecialKind = 'tube' | 'gear';
 
 /** Auswahl der Körper (Würfel, Kugel, ..., Röhre, Zahnrad); liefert die Art oder null. */
-export function openKindPicker(): Promise<PartKind | SpecialKind | null> {
+export function openKindPicker(figure = false): Promise<PartKind | SpecialKind | null> {
   return new Promise((resolve) => {
     const o = overlay('overlay-dim');
     const panel = h('div', 'panel kind-panel');
@@ -31,10 +32,11 @@ export function openKindPicker(): Promise<PartKind | SpecialKind | null> {
     head.append(button('btn', ICONS.cross, () => done(null), 'Schließen'));
     const grid = h('div', 'kind-grid');
     for (const k of PART_KINDS) grid.append(button('btn labeled tool', lab(KIND_ICONS[k], KIND_LABELS[k]), () => done(k), KIND_LABELS[k]));
-    grid.append(
-      button('btn labeled tool', lab(SPECIAL_ICONS.tube, 'Röhre'), () => done('tube'), 'Röhre'),
-      button('btn labeled tool', lab(SPECIAL_ICONS.gear, 'Zahnrad'), () => done('gear'), 'Zahnrad'),
-    );
+    if (!figure)
+      grid.append(
+        button('btn labeled tool', lab(SPECIAL_ICONS.tube, 'Röhre'), () => done('tube'), 'Röhre'),
+        button('btn labeled tool', lab(SPECIAL_ICONS.gear, 'Zahnrad'), () => done('gear'), 'Zahnrad'),
+      );
     panel.append(head, grid);
     o.root.append(panel);
     o.root.addEventListener('click', (e) => {
@@ -254,8 +256,8 @@ async function buildText(text: string, font: FontChoice): Promise<TextResult | n
   }
 }
 
-/** Text eintippen (Bildschirmtastatur) und Schrift wählen. */
-export function openTextDialog(): Promise<TextResult | null> {
+/** Text eintippen (Bildschirmtastatur) und Schrift wählen. `single`: nur ein einzelner Buchstabe (ein neuer ersetzt den alten). */
+export function openTextDialog(single = false): Promise<TextResult | null> {
   return new Promise((resolve) => {
     const o = overlay('overlay-dim');
     const panel = h('div', 'panel text-panel');
@@ -314,7 +316,9 @@ export function openTextDialog(): Promise<TextResult | null> {
     }
 
     const press = (ch: string) => {
-      if (text.length < MAX_TEXT) text += ch;
+      if (single) {
+        if (ch.trim()) text = ch;
+      } else if (text.length < MAX_TEXT) text += ch;
       refresh();
     };
     const keyboard = buildKeyboard({
@@ -362,7 +366,7 @@ export type { ExportFormat };
  * Druckprüfung ohne Text: je Prüfung ein Symbol mit grünem Haken (in Ordnung) oder orangem Warnzeichen,
  * dazu die Wahl STL / 3MF. Warnungen sperren nichts. Liefert die Dateiart oder null (Abbrechen).
  */
-export function openExportPanel(check: PrintCheck, initial: ExportFormat): Promise<ExportFormat | null> {
+export function openExportPanel(check: PrintCheck, initial: ExportFormat, figure?: FigureCheck): Promise<ExportFormat | null> {
   return new Promise((resolve) => {
     const o = overlay('overlay-dim');
     const panel = h('div', 'panel export-panel');
@@ -378,9 +382,18 @@ export function openExportPanel(check: PrintCheck, initial: ExportFormat): Promi
       c.setAttribute('aria-label', label + (warn ? ': Achtung' : ': in Ordnung'));
       cards.append(c);
     };
-    card(ICONS3D.bed, check.outside, 'Bauraum');
-    card(ICONS3D.lift, check.floating, 'Schwebt');
-    card(ICONS3D.thin, check.thin, 'Dünne Stellen');
+    if (figure) {
+      // Spielfigur: Arbeitsfläche, höchstens 30 mm, Überhang, hängt alles zusammen, dünne Stellen
+      card(ICONS3D.bed, figure.outside, 'Breite');
+      card(ICONS3D.height, figure.tooTall, 'Höhe 30 Millimeter');
+      card(ICONS3D.overhang, figure.overhang, 'Überhang');
+      card(ICONS3D.loose, figure.loose, 'Teile hängen zusammen');
+      card(ICONS3D.thin, figure.thin, 'Dünne Stellen');
+    } else {
+      card(ICONS3D.bed, check.outside, 'Bauraum');
+      card(ICONS3D.lift, check.floating, 'Schwebt');
+      card(ICONS3D.thin, check.thin, 'Dünne Stellen');
+    }
 
     const fmts = h('div', 'fmt-row');
     const chips: [ExportFormat, HTMLButtonElement][] = (['stl', '3mf'] as const).map((f) => [
@@ -393,9 +406,33 @@ export function openExportPanel(check: PrintCheck, initial: ExportFormat): Promi
     chips.forEach(([, b]) => fmts.append(b));
 
     const head = h('div', 'panel-head');
-    head.append(button('btn', ICONS.cross, () => done(null), 'Abbrechen'), h('div', 'spacer'), button('btn send', ICONS.check, () => done(fmt), 'Weiter'));
+    const next = button('btn send', ICONS.check, () => done(fmt), 'Weiter');
+    next.disabled = !!figure && !figure.ok; // Spielfigur: erst exportieren, wenn alles in Ordnung ist
+    head.append(button('btn', ICONS.cross, () => done(null), 'Abbrechen'), h('div', 'spacer'), next);
     panel.append(head, cards, fmts);
     o.root.append(panel);
+  });
+}
+
+/** Fenster "Was ist das Problem?": je Problem ein Symbol und ein kurzer Satz; ohne Probleme ein grüner Haken. */
+export function openProblems(items: { icon: string; text: string }[]): Promise<void> {
+  return new Promise((resolve) => {
+    const o = overlay('overlay-dim');
+    const panel = h('div', 'panel problem-panel');
+    const done = () => {
+      o.close();
+      resolve();
+    };
+    const head = h('div', 'panel-head');
+    head.append(h('div', 'spacer'), button('btn send', ICONS.check, done, 'Verstanden'));
+    const list = h('div', 'problem-list');
+    if (!items.length) list.append(h('div', 'problem ok', `<span class="problem-ico">${ICONS.check}</span><span class="problem-txt">Alles in Ordnung. Du kannst die Figur exportieren.</span>`));
+    for (const it of items) list.append(h('div', 'problem', `<span class="problem-ico">${it.icon}</span><span class="problem-txt">${it.text}</span>`));
+    panel.append(head, list);
+    o.root.append(panel);
+    o.root.addEventListener('click', (e) => {
+      if (e.target === o.root) done();
+    });
   });
 }
 
