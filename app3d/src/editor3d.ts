@@ -5,10 +5,10 @@ import { formatNumber, openNumpad } from '../../src/numpad';
 import type { Shape } from '../../src/geometry';
 import type { Bed } from './bed';
 import { combine } from './csg';
-import { notify, openKindPicker, openShapePicker, openSketch, openTextDialog, pickSvg } from './dialogs3d';
+import { notify, openKindPicker, openProblems, openShapePicker, openSketch, openTextDialog, pickSvg } from './dialogs3d';
 import { createDesign, packDesign, unpackDesign } from './designIO';
 import { busyOverlay, exportParts } from './exportFlow';
-import { BASE_MAX, BASE_MIN, FIGURE_BED, figureCheck, isBase, makeBase, makeFigureKind, maxHeightAt, resizeBase, type FigureCheck } from './figure';
+import { BASE_MAX, BASE_MIN, FIGURE_BED, PROBLEM_TEXT, figureCheck, figureProblems, isBase, makeBase, makeFigureKind, maxHeightAt, resizeBase, type FigureCheck } from './figure';
 import { History } from './history';
 import { ICONS3D, KIND_ICONS, SPECIAL_ICONS } from './icons3d';
 import { MAX_TEETH, MIN_TEETH } from './shapes3d';
@@ -62,7 +62,7 @@ export class Editor3d {
   private dimEls = new Map<DimField, HTMLElement>();
   private dims!: HTMLElement;
   private lockBtn!: HTMLButtonElement;
-  private status!: HTMLElement;
+  private status!: HTMLButtonElement;
   private stage!: HTMLElement;
   private coach: Coach | null = null;
   private exported = false;
@@ -99,7 +99,7 @@ export class Editor3d {
     this.btn.hole = button('btn labeled', lab(ICONS3D.hole, 'Loch'), () => this.toggleHole(), 'Loch');
     this.btn.merge = button('btn labeled', lab(ICONS3D.merge, 'Vereinen'), () => void this.merge(), 'Vereinen');
     this.btn.export = button('btn send labeled', lab(ICONS.share, 'Export'), () => void this.exportModel(), 'Exportieren');
-    this.status = h('div', 'status', ICONS.warn);
+    this.status = button('status', ICONS.warn, () => void this.showProblems(), 'Was ist das Problem?');
     const home = button('btn labeled', lab(ICONS3D.home, 'Ansicht'), () => this.view.resetView(), 'Ansicht zurücksetzen');
     const group = h('div', 'top-group');
     group.append(this.btn.undo, this.btn.redo, this.btn.copy, this.btn.del);
@@ -450,6 +450,21 @@ export class Editor3d {
     if (!sel && this.tiltPanel) this.closeTilt();
     this.status.classList.toggle('bad', outside.size > 0 || !!wrong);
     this.coach?.update();
+  }
+
+  /** Auf das Warnzeichen getippt: erklären, was nicht passt (Spielfigur: alle Prüfungen, sonst nur "außerhalb"). */
+  private async showProblems(): Promise<void> {
+    if (this.fig) {
+      clearTimeout(this.figTimer);
+      await this.runFigureCheck(); // aktuellen Stand prüfen
+      const c = this.figCheck;
+      if (!c) return notify(ICONS.warn);
+      if (c.onlyBase) return void (await openProblems([{ icon: ICONS3D.figure, text: 'Setze zuerst etwas auf den Sockel: einen Körper, eine Form oder einen Buchstaben.' }]));
+      const icons = { outside: ICONS3D.bed, tooTall: ICONS3D.height, overhang: ICONS3D.overhang, loose: ICONS3D.loose, thin: ICONS3D.thin };
+      return void (await openProblems(figureProblems(c).map((k) => ({ icon: icons[k], text: PROBLEM_TEXT[k] }))));
+    }
+    const out = this.parts.some((p) => !p.hole && isOutside(p, this.bed));
+    await openProblems(out ? [{ icon: ICONS3D.bed, text: 'Etwas liegt außerhalb des Druckbetts. Schiebe es zurück oder mach es kleiner.' }] : []);
   }
 
   // ---------- Spielfigur: laufende Druckprüfung ----------

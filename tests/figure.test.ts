@@ -11,6 +11,8 @@ import {
   makeFigureKind,
   maxHeightAt,
   newFigureParts,
+  figureProblems,
+  PROBLEM_TEXT,
   resizeBase,
 } from '../app3d/src/figure';
 import { PART_KINDS } from '../app3d/src/mesh';
@@ -189,6 +191,19 @@ describe('Druckprüfung der Figur', () => {
     const { c } = await check([...base, onBase(letter, base)]);
     expect(c).toMatchObject({ overhang: false, loose: false, tooTall: false, outside: false });
     expect(c.ok).toBe(true);
+  });
+
+  it('Probleme werden in fester Reihenfolge mit Erklärung genannt', async () => {
+    const base = newFigureParts();
+    const tallAndFloating = { ...makeFigureKind('cylinder'), h: 20, z: 15 }; // 35 mm hoch, schwebt
+    const { c } = await check([...base, tallAndFloating]);
+    const list = figureProblems(c);
+    expect(list).toContain('tooTall');
+    expect(list).toContain('loose');
+    expect(list.indexOf('tooTall')).toBeLessThan(list.indexOf('loose'));
+    for (const k of list) expect(PROBLEM_TEXT[k].length).toBeGreaterThan(20);
+    const good = await check([...base, onBase(makeFigureKind('cylinder'), base)]);
+    expect(figureProblems(good.c)).toEqual([]);
   });
 
   it('Löcher zählen nicht als Teil der Figur', async () => {

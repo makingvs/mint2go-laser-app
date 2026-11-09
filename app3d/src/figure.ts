@@ -185,6 +185,22 @@ export interface FigureCheck {
   ok: boolean;
 }
 
+export type ProblemKind = 'outside' | 'tooTall' | 'overhang' | 'loose' | 'thin';
+
+/** Was ist nicht druckbar und was kann das Kind tun? (kurze Sätze für die Fehler-Anzeige) */
+export const PROBLEM_TEXT: Record<ProblemKind, string> = {
+  outside: 'Etwas ist zu breit oder liegt neben der Fläche. Mach es kleiner oder schiebe es zurück.',
+  tooTall: `Die Figur ist höher als ${FIGURE_MAX_HEIGHT} mm. Mach ein Teil niedriger oder setze es tiefer.`,
+  overhang: 'Ein Teil ragt zu weit in die Luft. Der Drucker kann nicht in die Luft drucken. Mach das Teil kleiner, gib ihm einen breiteren Hals oder setze es tiefer in das Teil darunter.',
+  loose: 'Teile hängen nicht zusammen oder schweben. Schiebe sie so, dass sie sich überlappen. Eine Kugel berührt nur in einem Punkt: setze sie etwas tiefer hinein.',
+  thin: 'Eine Stelle ist zu dünn zum Drucken. Mach sie dicker.',
+};
+
+/** Die Probleme einer Figur in fester Reihenfolge; leer = druckbar. */
+export function figureProblems(c: FigureCheck): ProblemKind[] {
+  return (['outside', 'tooTall', 'overhang', 'loose', 'thin'] as const).filter((k) => c[k]);
+}
+
 export function figureCheck(parts: Part[], model: Pick<FinalModel, 'pos' | 'idx' | 'components'>, nozzle: number): FigureCheck {
   const onlyBase = !parts.some((p) => !p.hole && !isBase(p));
   const flat: Bed = { ...FIGURE_BED, height: Infinity };

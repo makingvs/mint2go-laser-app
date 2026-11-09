@@ -414,6 +414,28 @@ export function openExportPanel(check: PrintCheck, initial: ExportFormat, figure
   });
 }
 
+/** Fenster "Was ist das Problem?": je Problem ein Symbol und ein kurzer Satz; ohne Probleme ein grüner Haken. */
+export function openProblems(items: { icon: string; text: string }[]): Promise<void> {
+  return new Promise((resolve) => {
+    const o = overlay('overlay-dim');
+    const panel = h('div', 'panel problem-panel');
+    const done = () => {
+      o.close();
+      resolve();
+    };
+    const head = h('div', 'panel-head');
+    head.append(h('div', 'spacer'), button('btn send', ICONS.check, done, 'Verstanden'));
+    const list = h('div', 'problem-list');
+    if (!items.length) list.append(h('div', 'problem ok', `<span class="problem-ico">${ICONS.check}</span><span class="problem-txt">Alles in Ordnung. Du kannst die Figur exportieren.</span>`));
+    for (const it of items) list.append(h('div', 'problem', `<span class="problem-ico">${it.icon}</span><span class="problem-txt">${it.text}</span>`));
+    panel.append(head, list);
+    o.root.append(panel);
+    o.root.addEventListener('click', (e) => {
+      if (e.target === o.root) done();
+    });
+  });
+}
+
 /** Kurzer Hinweis ohne Text: großes Symbol, verschwindet von selbst oder beim Antippen. */
 export function notify(iconHtml: string): void {
   const o = overlay('overlay-dim');
