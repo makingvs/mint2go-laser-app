@@ -1,8 +1,7 @@
-// Such-Fenster für Bilder aus dem Internet (Iconify). Eingabe über eigene Buchstabentasten
-// (die iPad-Tastatur würde die Fläche verschieben); Vorschläge zum Antippen für Kinder, die noch nicht tippen.
+// Such-Fenster für Bilder aus dem Internet (Iconify). Eingabe über die Tastatur des Geräts;
+// Vorschläge zum Antippen für Kinder, die noch nicht tippen.
 import { button, h, overlay } from './dom';
 import { ICONS } from './icons';
-import { buildKeyboard } from './keyboard';
 import { TOPICS, fetchIconSvg, hitRef, searchIcons, type Hit, type SearchConfig } from './online';
 
 const MAX_QUERY = 20;
@@ -11,37 +10,33 @@ const MAX_QUERY = 20;
  * onPick bekommt SVG-Text und Referenz; true = übernommen (Fenster schließt), false = Fehler (Kachel wackelt).
  */
 export function openOnlineSearch(cfg: SearchConfig, onPick: (svg: string, ref: string) => Promise<boolean>): void {
-  const dlg = overlay('overlay-dim');
+  const dlg = overlay('overlay-dim overlay-top');
   const panel = h('div', 'panel search-panel');
   const head = h('div', 'panel-head');
-  const display = h('div', 'search-display');
+  const input = h('input', 'name-input search-input');
+  input.type = 'search';
+  input.maxLength = MAX_QUERY;
+  input.placeholder = 'Suchen';
+  input.autocomplete = 'off';
+  input.spellcheck = false;
+  input.enterKeyHint = 'search';
+  input.setAttribute('autocorrect', 'off');
+  input.setAttribute('autocapitalize', 'off');
+  input.setAttribute('aria-label', 'Suchbegriff');
   const go = button('btn send', ICONS.search, () => void run(true), 'Suchen');
-  head.append(button('btn', ICONS.cross, () => dlg.close(), 'Schließen'), display, go);
+  head.append(button('btn', ICONS.cross, () => dlg.close(), 'Schließen'), input, go);
 
   const body = h('div', 'search-body');
   const results = h('div', 'pick-grid search-results');
-  const keyboard = buildKeyboard({
-    shift: false,
-    onChar: (ch) => press(ch),
-    onSpace: () => press(' '),
-    onBackspace: () => {
-      text = text.slice(0, -1);
-      showText();
-      void run(false);
-    },
-  });
-  keyboard.el.classList.add('search-kb');
-  body.append(results, keyboard.el);
+  body.append(results);
   panel.append(head, body);
   dlg.root.append(panel);
 
-  let text = '';
   let timer = 0;
   let ctrl: AbortController | null = null;
 
   const showText = () => {
-    display.innerHTML = `<span class="s-ico">${ICONS.search}</span><span class="s-text">${text.toUpperCase()}</span><span class="cursor"></span>`;
-    go.disabled = !text.trim();
+    go.disabled = !input.value.trim();
   };
 
   const topics = () => {
@@ -49,7 +44,7 @@ export function openOnlineSearch(cfg: SearchConfig, onPick: (svg: string, ref: s
     for (const t of TOPICS) {
       results.append(
         button('pick-item topic', `<span class="emoji">${t.emoji}</span>`, () => {
-          text = t.query;
+          input.value = t.query;
           showText();
           void run(true);
         }, t.query),
@@ -86,7 +81,7 @@ export function openOnlineSearch(cfg: SearchConfig, onPick: (svg: string, ref: s
   async function run(now = false): Promise<void> {
     clearTimeout(timer);
     ctrl?.abort();
-    const q = text.trim();
+    const q = input.value.trim().toLowerCase();
     if (!q) {
       topics();
       return;
@@ -108,11 +103,17 @@ export function openOnlineSearch(cfg: SearchConfig, onPick: (svg: string, ref: s
     }
   }
 
-  const press = (ch: string) => {
-    if (text.length < MAX_QUERY) text += ch;
+  input.addEventListener('input', () => {
     showText();
     void run(false);
-  };
+  });
+  input.addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    input.blur();
+    void run(true);
+  });
   showText();
   topics();
+  input.focus();
 }

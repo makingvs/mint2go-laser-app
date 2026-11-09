@@ -1,5 +1,6 @@
 // Datenmodell: Entwurf mit Elementen, alle Maße in Millimetern.
 import type { GuideState } from './guided/engine';
+import { fittedBase } from './shapes';
 import { bbox, distToPolyline, featureSize, pointInShape, transformShape, type Ring, type Shape, type Transform } from './geometry';
 
 export type Op = 'cut' | 'engrave' | 'fill';
@@ -20,6 +21,8 @@ export interface El {
   h: number;
   rot: number;
   op: Op;
+  /** Gesperrt: Größe, Lage, Drehung, Art und Löschen sind gesperrt */
+  locked?: boolean;
   /** Bei Text: Schrift, Wortlaut und Maße bei der Erstellung (zum nachträglichen Ändern der Schrift) */
   text?: { font: string; value: string; w0: number; h0: number };
 }
@@ -116,7 +119,8 @@ export function makeElement(o: NewElementOptions): El {
 export const transformOf = (e: El): Transform => ({ x: e.x, y: e.y, w: e.w, h: e.h, rot: e.rot });
 
 export function worldShape(e: El): Shape {
-  return transformShape(e.base, transformOf(e));
+  const base = e.kind === 'shape' ? fittedBase(e.ref, e.w, e.h) : null;
+  return transformShape(base ?? e.base, transformOf(e));
 }
 
 /** Aus offenen Linien, die als Fläche graviert werden sollen, wird eine geschlossene Form. */

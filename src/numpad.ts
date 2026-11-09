@@ -9,18 +9,21 @@ export interface NumpadOptions {
   unit: string;
   min: number;
   max: number;
+  /** Nachkommastellen (Standard 1; z. B. 2 für Schnittbreite in mm) */
+  decimals?: number;
 }
 
 /** Zahl für die Anzeige: höchstens eine Nachkommastelle, Komma als Trenner. */
-export function formatNumber(n: number): string {
-  return String(+n.toFixed(1)).replace('.', ',');
+export function formatNumber(n: number, decimals = 1): string {
+  return String(+n.toFixed(decimals)).replace('.', ',');
 }
 
 /** Eingabe ("12,5") in eine Zahl umwandeln und in den erlaubten Bereich bringen; null bei Unsinn. */
-export function parseEntry(text: string, min: number, max: number): number | null {
+export function parseEntry(text: string, min: number, max: number, decimals = 1): number | null {
   const v = Number(text.replace(',', '.'));
   if (!text || !Number.isFinite(v)) return null;
-  return Math.min(max, Math.max(min, Math.round(v * 10) / 10));
+  const f = 10 ** decimals;
+  return Math.min(max, Math.max(min, Math.round(v * f) / f));
 }
 
 /** Öffnet die Zahlentastatur; liefert die neue Zahl oder null bei Abbruch. */
@@ -29,7 +32,8 @@ export function openNumpad(o: NumpadOptions): Promise<number | null> {
     const dlg = overlay('overlay-dim');
     const card = h('div', 'numpad');
     const display = h('div', 'np-display');
-    let text = formatNumber(o.value);
+    const dec = o.decimals ?? 1;
+    let text = formatNumber(o.value, dec);
     let fresh = true; // erste Ziffer ersetzt den alten Wert
     const show = () => {
       display.innerHTML = `<span class="np-ico">${o.icon}</span><span class="np-val">${text || '0'}</span><span class="np-unit">${o.unit}</span>`;
@@ -45,7 +49,7 @@ export function openNumpad(o: NumpadOptions): Promise<number | null> {
         if (!text) text = '0';
       } else if (text === '0') text = '';
       if (text.replace(',', '').length >= 6) return;
-      if (text.includes(',') && text.split(',')[1].length >= 1 && k !== ',') return; // eine Nachkommastelle
+      if (text.includes(',') && text.split(',')[1].length >= dec && k !== ',') return; // Nachkommastellen begrenzen
       text += k;
       show();
     };
@@ -66,7 +70,7 @@ export function openNumpad(o: NumpadOptions): Promise<number | null> {
     row.append(
       button('big-btn no', ICONS.cross, () => done(null), 'Abbrechen'),
       button('big-btn yes', ICONS.check, () => {
-        const v = parseEntry(text, o.min, o.max);
+        const v = parseEntry(text, o.min, o.max, dec);
         if (v === null) {
           row.classList.remove('shake');
           void row.offsetWidth;

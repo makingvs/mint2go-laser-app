@@ -1,0 +1,62 @@
+/* Objekt sperren (Kopfleiste) und Hand-Werkzeug (Zoom-Leiste) */
+.btn.labeled.active:not(.tool):not(.op) {
+  background: var(--blue-tint);
+  box-shadow: 0 0 0 3px var(--m-blue) inset;
+}
+.btn.labeled.active:not(.tool):not(.op) .lbl {
+  color: var(--m-navy);
+}
+.btn.zoom.hand.active {
+  background: var(--m-green);
+  box-shadow: 0 3px 0 var(--m-green-dark);
+}
+.btn.zoom.hand.active .lbl {
+  color: #fff;
+}
+.canvas.hand {
+  cursor: grab;
+}
+.canvas.hand:active {
+  cursor: grabbing;
+}
+
+/* vier Zoom-Tasten (mit Hand) passen auch bei ca. 768 px Höhe in die rechte Leiste */
+@media (max-height: 800px) and (min-height: 761px) {
+  :root {
+    --op-h: 90px;
+    --zoom-h: 58px;
+    --lb-h: 64px;
+    --ico: 30px;
+  }
+}
+
+/* Fenster mit Eingabefeld: oben, damit die Bildschirmtastatur nichts verdeckt */
+.overlay-top {
+  align-items: flex-start;
+}
+.overlay-top .panel {
+  max-height: calc(var(--vvh, 100vh) - 36px);
+}
+.overlay-top .search-panel {
+  height: min(700px, calc(var(--vvh, 100vh) - 36px));
+}
+.text-panel {
+  overflow-y: auto;
+}
+.text-panel .text-preview {
+  flex: none;
+  width: 100%;
+  height: 96px;
+}
+.text-input,
+.search-input {
+  font-weight: 700;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.search-body .search-results {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+.canvas.measuring {
+  cursor: crosshair;
+}
