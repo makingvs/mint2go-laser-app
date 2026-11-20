@@ -162,6 +162,15 @@ Oben die Taste **Auswahl**: Teile lassen sich nur noch antippen und verschieben.
 
 Oben die Taste **Messen**: Mit dem Finger oder der Maus von einem Punkt zum anderen ziehen. Die Messlinie zeigt die Länge in mm und darunter den Abstand waagerecht und senkrecht. Ist **Fangen** an, rasten die Endpunkte an Ecken, Kantenmitten und Mitten der Teile und der Fläche ein. Die Messlinie kommt nicht in die Datei; sie verschwindet beim Beenden von Messen.
 
+## Freihand: geglättet oder wie gezeichnet
+
+Ein Tipp auf **Freihand** öffnet daneben eine Auswahl mit zwei Kacheln:
+
+- **Geglättet**: wie bisher. Kleine Wackler werden ausgeglichen, die Linie wird weich; fast geschlossene Linien (Enden näher als 8 mm bzw. ein Fünftel der Linienlänge) werden geschlossen.
+- **Wie gezeichnet**: Die Linie bleibt genau so, wie Finger oder Stift sie ziehen. Nur doppelte Punkte (näher als 0,05 mm) fallen weg. Geschlossen wird nur, wenn sich Anfang und Ende fast berühren (unter 3 mm) oder „Füllen“ gewählt ist.
+
+Danach wird gezeichnet; ein weiterer Tipp auf Freihand beendet das Zeichnen. Die gewählte Art merkt sich das Gerät, das Freihand-Symbol zeigt sie an (weiche Kurve bzw. zittrige Linie). Schon gezeichnete Linien bleiben unverändert. Logik: `src/stroke.ts`.
+
 ## Runde Ecken
 
 Das abgerundete Quadrat und die Sprechblase behalten beim Skalieren **kreisrunde Ecken**, auch wenn sie stark gestreckt werden: Der Radius richtet sich nach der kürzeren Seite (`src/shapes.ts`, `fittedBase`).

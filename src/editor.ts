@@ -8,7 +8,7 @@ import { Coach } from './guided/coach';
 import { openFinish } from './guided/dialogs';
 import type { Highlight, Snapshot } from './guided/engine';
 import { projectByNumber } from './guided/projects';
-import { bbox, dist, resample, shapeToPath, simplify, smooth, transformPoint, type Pt, type Ring, type Shape } from './geometry';
+import { bbox, dist, shapeToPath, transformPoint, type Pt, type Shape } from './geometry';
 import { ICONS, SHAPE_ICONS } from './icons';
 import { History, isTooThin, makeElement, newId, normalizeBase, pickElement, type Design, type El, type Op, type Settings, type Surface, worldShape } from './model';
 import { canvasBackground, elementMarkup } from './render';
@@ -17,6 +17,7 @@ import { openSurfaceDialog } from './surfaceDialog';
 import { snapMove, snapTolerance, type Box, type Guide } from './snap';
 import { boxPoints, measureLabel, snapToPoint } from './measure';
 import { shortcutFor } from './shortcuts';
+import { strokeToRing, type StrokeStyle } from './stroke';
 import { SHAPE_GROUPS, SHAPE_LABELS, baseShape, type ShapeId } from './shapes';
 import { GLYPH_HEIGHT, textShape } from './text';
 import { FONTS, fontStyle, fontTextShape, textInfo, type FontChoice } from './fonts';
@@ -74,6 +75,14 @@ export class Editor {
   private clientPts = new Map<number, Pt>();
   /** Auswahl-Werkzeug: Teile lassen sich nur auswählen und verschieben (keine Griffe) */
   private moveOnly = false;
+  /** Freihand: geglättet oder genau wie gezeichnet (auf dem Gerät gemerkt) */
+  private drawStyle: StrokeStyle = (() => {
+    try {
+      return localStorage.getItem('laser.draw') === 'raw' ? 'raw' : 'smooth';
+    } catch {
+      return 'smooth';
+    }
+  })();
   /** Mess-Werkzeug */
   private measureMode = false;
   private measureLine: { a: Pt; b: Pt } | null = null;
@@ -214,7 +223,7 @@ export class Editor {
     };
     // Gruppe 1: Formen (alle in einer Auswahl) und Freihand direkt darunter
     this.btn.shapes = button('btn labeled tool', lab(ICONS.shapes, 'Formen'), () => this.openShapes(), 'Formen');
-    this.btn.draw = button('btn labeled tool', lab(ICONS.draw, 'Freihand'), () => this.toggleDraw(), 'Zeichnen');
+    this.btn.draw = button('btn labeled tool', lab(ICONS.draw, 'Freihand'), () => (this.drawMode ? this.toggleDraw() : this.openDrawChoice()), 'Zeichnen');
     // Gruppe 2: Bilder (hochladen, SVG, Suche im Internet)
     const imageInput = pickFile('image/*', (f) => void this.importImage(f));
     const svgInput = pickFile('.svg,image/svg+xml', (f) => void this.importSvg(f));
@@ -791,6 +800,10 @@ export class Editor {
     this.btn.lock.setAttribute('aria-label', frozen ? 'Objekt entsperren' : 'Objekt sperren');
     this.btn.hand.classList.toggle('active', this.handMode);
     this.btn.select.classList.toggle('active', this.moveOnly);
+    if (this.btn.draw.dataset.style !== this.drawStyle) {
+      this.btn.draw.dataset.style = this.drawStyle;
+      this.btn.draw.innerHTML = lab(this.drawStyle === 'raw' ? ICONS.drawRaw : ICONS.draw, 'Freihand');
+    }
     this.btn.measure.classList.toggle('active', this.measureMode);
     this.svg.classList.toggle('measuring', this.measureMode);
     this.btn.snap.classList.toggle('active', this.snapOn);
@@ -1228,6 +1241,43 @@ export class Editor {
     });
   }
 
+  /** Freihand: zuerst wählen, ob geglättet oder genau wie gezeichnet. */
+  private openDrawChoice(): void {
+    this.leaveTools();
+    this.render();
+    const anchor = this.btn.draw.getBoundingClientRect();
+    const o = overlay('overlay-clear');
+    const fly = h('div', 'flyout draw-fly');
+    fly.style.left = `${anchor.right + 14}px`;
+    fly.style.top = `${Math.max(8, anchor.top - 8)}px`;
+    const close = () => {
+      o.close();
+      this.btn.draw.classList.remove('active');
+    };
+    const choice = (style: StrokeStyle, icon: string, label: string, hint: string) =>
+      button('btn tool labeled draw-choice' + (style === this.drawStyle ? ' active' : ''), lab(icon, label), () => {
+        close();
+        this.drawStyle = style;
+        try {
+          localStorage.setItem('laser.draw', style);
+        } catch {
+          /* ignorieren */
+        }
+        this.toggleDraw();
+      }, hint);
+    fly.append(
+      choice('smooth', ICONS.draw, 'Geglättet', 'Geglättet: Wackler werden ausgeglichen'),
+      choice('raw', ICONS.drawRaw, 'Wie gezeichnet', 'Wie gezeichnet: Linie bleibt genau so'),
+    );
+    o.root.addEventListener('click', (e) => {
+      if (e.target === o.root) close();
+    });
+    this.btn.draw.classList.add('active');
+    o.root.append(fly);
+    const top = Math.max(8, Math.min(parseFloat(fly.style.top), window.innerHeight - fly.offsetHeight - 10));
+    fly.style.top = `${top}px`;
+  }
+
   private toggleDraw(): void {
     const on = !this.drawMode;
     this.leaveTools();
@@ -1237,31 +1287,14 @@ export class Editor {
     this.render();
   }
 
-  /** Strich glätten, vereinfachen, fast geschlossene Linien schließen. */
+  /** Strich in eine Linie oder einen Umriss verwandeln (geglättet oder wie gezeichnet, siehe stroke.ts). */
   private finishStroke(raw: Pt[]): void {
-    let length = 0;
-    for (let i = 1; i < raw.length; i++) length += dist(raw[i - 1], raw[i]);
-    if (raw.length < 3 || length < 8) {
+    const res = strokeToRing(raw, this.drawStyle, this.currentOp === 'fill');
+    if (!res) {
       this.requestRender();
       return;
     }
-    const nearClosed = dist(raw[0], raw[raw.length - 1]) < Math.max(8, length * 0.2);
-    const closed = nearClosed || this.currentOp === 'fill';
-    let pts = resample(raw, 1.5, false);
-    let ring: Ring;
-    if (closed) {
-      if (pts.length > 3 && dist(pts[0], pts[pts.length - 1]) < 4) pts = pts.slice(0, -1);
-      pts = smooth(pts, 5, true);
-      const s = simplify([...pts, pts[0]], 0.25);
-      s.pop();
-      ring = s;
-    } else {
-      ring = simplify(smooth(pts, 5, false), 0.25);
-    }
-    if (ring.length < (closed ? 3 : 2)) {
-      this.requestRender();
-      return;
-    }
+    const { ring, closed } = res;
     const b = bbox([ring]);
     const w = b.maxX - b.minX;
     const hh = b.maxY - b.minY;

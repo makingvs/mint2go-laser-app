@@ -42,6 +42,7 @@ export const ICONS = {
   magnet: svg('<path d="M5 3v9a7 7 0 0 0 14 0V3"/><path d="M5 7h4M15 7h4"/>'),
   cursor: svg('<path d="M6 3l13 9.500-6 1.200-3.200 6.300z"/>'),
   ruler: svg('<rect x="2" y="8" width="20" height="8" rx="1.500"/><path d="M6 8v3M10 8v4.500M14 8v3M18 8v4.500"/>'),
+  drawRaw: svg('<circle cx="4" cy="18" r="1.600" fill="currentColor" stroke="none"/><path d="M4 18l1.600-2.400 1 1.300 1.400-3.200 1.200 1.600 1.500-3.600 1 1.700 1.700-3.200 1.100 1.400 1.700-2.800 1 1.500 2-2.400"/>'),
   center: svg('<circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/>'),
   check: svg('<path d="m4 12 6 6L20 6"/>'),
   cross: svg('<path d="M6 6l12 12M18 6 6 18"/>'),
