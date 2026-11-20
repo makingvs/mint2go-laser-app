@@ -5,7 +5,7 @@ import { formatNumber, openNumpad } from '../../src/numpad';
 import type { Shape } from '../../src/geometry';
 import type { Bed } from './bed';
 import { combine } from './csg';
-import { notify, openKindPicker, openProblems, openShapePicker, openShortcutHelp, openSketch, openTextDialog, pickSvg } from './dialogs3d';
+import { explain, openKindPicker, openProblems, openShapePicker, openShortcutHelp, openSketch, openTextDialog, pickSvg } from './dialogs3d';
 import { createDesign, packDesign, unpackDesign } from './designIO';
 import { busyOverlay, exportParts } from './exportFlow';
 import { BASE_MAX, BASE_MIN, FIGURE_BED, figureCheck, figureProblems, isBase, makeBase, makeFigureKind, maxHeightAt, problemText, resizeBase, type FigureCheck } from './figure';
@@ -19,7 +19,8 @@ import type { GuideState, Highlight, Snapshot } from './werkstatt/engine3d';
 import { projectByNumber } from './werkstatt/projects3d';
 import type { PartKind } from './mesh';
 import { MAX_SIZE, MIN_SIZE, applyDim, centered, cloneParts, createPart, findFreeSpot, isOutside, makeGearPart, makeOutlinePart, makeTubePart, newId, type DimField, type OutlineSize, type Part } from './model3d';
-import { buildFinal } from './printExport';
+import { MSG, freeProblems } from './problems3d';
+import { buildFinal, printCheck } from './printExport';
 import { storage, type Design, type ExportFormat, type Profile, type Settings } from './storage3d';
 import { arrowDelta, shortcut3dFor, type Action3d } from './shortcuts3d';
 import { restOn, supportHeight } from './support';
@@ -292,11 +293,12 @@ export class Editor3d {
   /** Den gewählten Körper mit allen, die ihn berühren, zu einem Teil vereinen (Löcher schneiden aus). */
   private async merge(): Promise<void> {
     const p = this.selected();
-    if (!p) return;
+    if (!p) return void explain(ICONS3D.merge, MSG.mergeNoSelection); // Die Taste bleibt anwählbar und erklärt, was zu tun ist
     const busy = busyOverlay();
     const r = await combine(p.id, this.parts).catch(() => ({ kind: 'error' as const }));
     busy.close();
-    if (r.kind !== 'ok') return notify(ICONS.warn); // nichts berührt den Körper, oder ein Körper ist nicht in Ordnung
+    if (r.kind === 'none') return void explain(ICONS3D.merge, MSG.mergeNothingTouches);
+    if (r.kind === 'error') return void explain(ICONS3D.merge, MSG.mergeBroken);
     this.parts = [...this.parts.filter((q) => !r.ids.includes(q.id)), ...(r.part ? [r.part] : [])];
     this.selectedId = r.part?.id ?? null;
     this.commit();
@@ -364,14 +366,14 @@ export class Editor3d {
   private drawSvg(): void {
     pickSvg(
       (shape) => void this.addDrawn(shape, { longest: 50 }, 8, 'svg'),
-      () => notify(ICONS.warn),
+      () => void explain(ICONS.warn, MSG.svgBad),
     );
   }
 
   /** Umriss als Körper auf freien Platz setzen, dann nach der Höhe fragen (Abbrechen behält die Starthöhe). */
   private async addDrawn(shape: Shape, size: OutlineSize, height: number, tag?: string): Promise<void> {
     const probe = makeOutlinePart(shape, size, height, this.bed, 0, 0, tag);
-    if (!probe) return notify(ICONS.warn);
+    if (!probe) return void explain(ICONS.warn, MSG.drawEmpty);
     let p: Part;
     if (this.fig) p = this.dropOnto(probe); // Spielfigur: Mitte des Sockels
     else {
@@ -551,7 +553,7 @@ export class Editor3d {
     this.btn.del.disabled = !sel || base;
     this.btn.hole.disabled = !sel;
     this.btn.hole.classList.toggle('active', !!sel?.hole);
-    this.btn.merge.disabled = !sel;
+    this.btn.merge.classList.toggle('soft', !sel); // nicht gesperrt: ohne Auswahl erklärt die Taste, was zu tun ist
     for (const k of ['tilt', 'mirror', 'align'] as const) this.railBtn[k].disabled = !sel;
     if (!sel && this.tiltPanel) this.closeTilt();
     this.status.classList.toggle('bad', outside.size > 0 || !!wrong);
@@ -564,13 +566,20 @@ export class Editor3d {
       clearTimeout(this.figTimer);
       await this.runFigureCheck(); // aktuellen Stand prüfen
       const c = this.figCheck;
-      if (!c) return notify(ICONS.warn);
-      if (c.onlyBase) return void (await openProblems([{ icon: ICONS3D.figure, text: 'Setze zuerst etwas auf den Sockel: einen Körper, eine Form oder einen Buchstaben.' }]));
+      if (!c) return void (await explain(ICONS.warn, MSG.checkFailed));
+      if (c.onlyBase) return void (await explain(ICONS3D.figure, MSG.exportBase));
       const icons = { outside: ICONS3D.bed, tooTall: ICONS3D.height, overhang: ICONS3D.overhang, loose: ICONS3D.loose, thin: ICONS3D.thin };
       return void (await openProblems(figureProblems(c).map((k) => ({ icon: icons[k], text: problemText(k, c) }))));
     }
-    const out = this.parts.some((p) => !p.hole && isOutside(p, this.bed));
-    await openProblems(out ? [{ icon: ICONS3D.bed, text: 'Etwas liegt außerhalb des Druckbetts. Schiebe es zurück oder mach es kleiner.' }] : []);
+    // freie Arbeit: die ganze Druckprüfung (Druckbett, schwebt, zu dünn/klein) auf Abruf
+    const busy = busyOverlay();
+    const model = await buildFinal(this.parts).catch(() => 'error' as const);
+    busy.close();
+    if (model === 'error') return void (await explain(ICONS.warn, MSG.checkFailed));
+    if (!model) return void (await openProblems(this.parts.length ? [{ icon: ICONS.warn, text: MSG.exportEmpty }] : []));
+    const icons = { outside: ICONS3D.bed, floating: ICONS3D.lift, thin: ICONS3D.thin };
+    const items = freeProblems(printCheck(this.parts, model, this.printer.bed, this.printer.nozzle), this.printer.nozzle).map((p) => ({ icon: icons[p.kind], text: p.text }));
+    await openProblems(items);
   }
 
   // ---------- Spielfigur: laufende Druckprüfung ----------
@@ -643,7 +652,7 @@ export class Editor3d {
     const p = this.selected();
     if (!p) return;
     const a = alignCenter(p, this.parts);
-    if (!a) return notify(ICONS.warn); // nichts in der Nähe
+    if (!a) return void explain(ICONS3D.align, MSG.alignNone); // nichts in der Nähe
     this.replace(p.id, a);
     this.commit();
   }

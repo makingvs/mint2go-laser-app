@@ -30,18 +30,28 @@ export type CombineResult =
 
 const TOUCH_TOLERANCE = 0.05; // mm
 
+/**
+ * Körper als manifold-Körper. Klappt es nicht auf Anhieb (z. B. doppelte Eckpunkte bei winzigen oder zusammengequetschten
+ * Teilen), wird das Netz repariert (Eckpunkte, die praktisch aufeinander liegen, werden verschweißt) und noch einmal versucht.
+ */
 export function toManifold(m: ManifoldToplevel, p: Part): Manifold | null {
-  try {
-    const mesh = new m.Mesh({ numProp: 3, vertProperties: new Float32Array(worldVertices(p)), triVerts: new Uint32Array(meshOf(p).idx) });
-    const man = new m.Manifold(mesh);
-    if (man.status() !== 'NoError') {
-      man.delete();
+  const props = new Float32Array(worldVertices(p));
+  const tris = new Uint32Array(meshOf(p).idx);
+  const attempt = (repair: boolean): Manifold | null => {
+    try {
+      const mesh = new m.Mesh({ numProp: 3, vertProperties: props, triVerts: tris });
+      if (repair) mesh.merge();
+      const man = new m.Manifold(mesh);
+      if (man.status() !== 'NoError') {
+        man.delete();
+        return null;
+      }
+      return man;
+    } catch {
       return null;
     }
-    return man;
-  } catch {
-    return null;
-  }
+  };
+  return attempt(false) ?? attempt(true);
 }
 
 const components = (man: Manifold): number => {

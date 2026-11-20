@@ -27,6 +27,8 @@ const COLORS = {
 
 const HANDLE_PX = 18; // sichtbarer Radius der Griffe in Pixeln
 const HIT_PX = 44; // Trefferradius (Finger sind dick)
+const SMALL_PX = 22; // Körper, deren Bild kleiner ist (Radius in Pixeln), lassen sich auch knapp daneben antippen ...
+const SLOP_PX = 30; // ... bis zu diesem Abstand vom Rand
 // Abstände der Griffe vom Körper in Bildschirm-Pixeln: So liegen sie auch bei kleinen Körpern weit genug auseinander
 const GAP_HEIGHT = 56; // Höhen-Griff über der Oberseite
 const GAP_SIZE = 40; // Größen-Griff außerhalb der Ecke
@@ -431,9 +433,27 @@ export class View3d {
     return o === this.hitSize ? 'size' : o === this.hitHeight ? 'height' : o === this.hitLift ? 'lift' : 'rotate';
   }
 
-  private pickPart(): string | null {
+  private pickPart(clientX: number, clientY: number): string | null {
     const hits = this.raycaster.intersectObjects([...this.meshes.values()], false);
-    return hits.length ? (hits[0].object.userData.id as string) : null;
+    if (hits.length) return hits[0].object.userData.id as string;
+    // Knapp daneben: sehr kleine Körper (kleiner als ein Fingertipp) werden auch getroffen, wenn der Finger nahe dran ist
+    const r = this.canvas.getBoundingClientRect();
+    let best: { id: string; d: number } | null = null;
+    for (const p of this.parts) {
+      const b = partBounds(p);
+      const c = new THREE.Vector3((b.min[0] + b.max[0]) / 2, (b.min[1] + b.max[1]) / 2, (b.min[2] + b.max[2]) / 2);
+      const radius = Math.hypot(b.max[0] - b.min[0], b.max[1] - b.min[1], b.max[2] - b.min[2]) / 2;
+      const ndc = c.clone().project(this.camera);
+      if (ndc.z > 1) continue; // hinter der Kamera
+      const px = r.left + ((ndc.x + 1) / 2) * r.width;
+      const py = r.top + ((1 - ndc.y) / 2) * r.height;
+      const mmPerPx = (2 * Math.tan((FOV_DEG * Math.PI) / 360) * this.camera.position.distanceTo(c)) / Math.max(1, this.host.clientHeight);
+      const rPx = radius / mmPerPx;
+      if (rPx > SMALL_PX) continue; // große Körper werden schon beim direkten Antippen getroffen
+      const d = Math.hypot(clientX - px, clientY - py) - rPx;
+      if (d <= SLOP_PX && (!best || d < best.d)) best = { id: p.id, d };
+    }
+    return best?.id ?? null;
   }
 
   // ---------- Gesten ----------
@@ -453,7 +473,7 @@ export class View3d {
     const handle = this.pickHandle();
     const sel = this.parts.find((p) => p.id === this.selectedId);
     if (handle && sel) return this.beginDrag(handle, sel, e);
-    const id = this.pickPart();
+    const id = this.pickPart(e.clientX, e.clientY);
     if (id && this.fixed.has(id) && !e.shiftKey && (e.buttons & 2) === 0) {
       this.tapFixed = id;
       this.camMode = true;

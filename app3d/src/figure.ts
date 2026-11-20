@@ -4,6 +4,7 @@ import type { Bed } from './bed';
 import { fitsInBuildVolume } from './bed';
 import { KIND_SIZE, type PartKind } from './mesh';
 import { createPart, partBounds, type Part } from './model3d';
+import { thinText } from './problems3d';
 import { printCheck, type FinalModel } from './printExport';
 
 export const BASE_DIAMETER = 25; // Sockel, mm
@@ -183,8 +184,10 @@ export interface FigureCheck {
   overhangParts: string[];
   /** Teile hängen nicht zusammen oder schweben */
   loose: boolean;
-  /** sehr dünne Stellen */
+  /** sehr dünne Stellen oder winzige Teile */
   thin: boolean;
+  /** Düsenbreite der Prüfung (mm), für den Satz zu "zu dünn" */
+  nozzle: number;
   /** alles in Ordnung: darf exportiert werden */
   ok: boolean;
 }
@@ -207,6 +210,7 @@ export function problemText(kind: ProblemKind, c: FigureCheck): string {
   if (kind === 'tooTall') return `Die Figur ist ${mm(c.height)} mm hoch. Erlaubt sind höchstens ${FIGURE_MAX_HEIGHT} mm mit Sockel. Mach ein Teil niedriger oder setze es tiefer.`;
   if (kind === 'overhang')
     return `Ein Teil ragt ${mm(c.reach)} mm in die Luft. Der Drucker schafft nur ${MAX_OVERHANG_REACH} mm ohne Stütze. Mach das Teil kleiner, gib ihm einen breiteren Hals oder setze es tiefer in das Teil darunter.`;
+  if (kind === 'thin') return thinText(c.nozzle);
   return PROBLEM_TEXT[kind];
 }
 
@@ -227,5 +231,5 @@ export function figureCheck(parts: Part[], model: Pick<FinalModel, 'pos' | 'idx'
   const overhang = big.length > 0;
   const height = Math.round(Math.max(0, ...model.components.map((c) => c.max[2])) * 10) / 10;
   const reach = Math.round(Math.max(0, ...big.map((s) => s.reach)) * 10) / 10;
-  return { onlyBase, outside, tooTall, height, overhang, reach, overhangParts, loose, thin, ok: !onlyBase && !outside && !tooTall && !overhang && !loose && !thin };
+  return { onlyBase, outside, tooTall, height, overhang, reach, overhangParts, loose, thin, nozzle, ok: !onlyBase && !outside && !tooTall && !overhang && !loose && !thin };
 }

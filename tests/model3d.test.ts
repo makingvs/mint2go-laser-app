@@ -42,10 +42,11 @@ describe('Körper', () => {
     const p = { ...createPart('box'), w: 20, d: 10, h: 40 };
     expect(applyDim(p, 'w', 30, false, bed)).toMatchObject({ w: 30, d: 10, h: 40 });
     expect(applyDim(p, 'w', 40, true, bed)).toMatchObject({ w: 40, d: 20, h: 80 });
-    expect(applyDim(p, 'h', 1, false, bed).h).toBe(MIN_SIZE);
+    expect(applyDim(p, 'h', 0.01, false, bed).h).toBe(MIN_SIZE);
+    expect(applyDim(p, 'h', 0.3, false, bed).h).toBe(0.3); // ganz klein ist erlaubt (MIN_SIZE = 0,1 mm)
     expect(applyDim(p, 'h', 9999, false, bed).h).toBe(MAX_SIZE);
     // mit Schloss: das kleinste Maß (d = 10) darf nicht unter das Minimum fallen
-    const small = applyDim(p, 'w', 0.5, true, bed);
+    const small = applyDim(p, 'w', 0.1, true, bed);
     expect(Math.min(small.w, small.d, small.h)).toBeCloseTo(MIN_SIZE, 6);
     expect(small.w / small.d).toBeCloseTo(2, 1);
     expect(applyDim(p, 'rot', -90, false, bed).rot).toBe(270);

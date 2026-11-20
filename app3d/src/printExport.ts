@@ -161,7 +161,8 @@ export function printCheck(parts: Part[], model: Pick<FinalModel, 'components'> 
   const outside = model.components.some((c) => !fitsInBuildVolume(c, bed));
   const floating = model.components.some((c) => c.min[2] > FLOAT_TOLERANCE);
   // featureSize = 4 * Fläche / Umfang ist bei einem Streifen etwa die doppelte Breite -> Breite < 2 Düsen = Maß < 4 Düsen
-  const thin = parts.some((p) => !p.hole && p.kind === 'extrude' && featureSize(scaledOutline(p)) < 4 * nozzle);
+  // Zu dünn: gezeichnete Körper mit Strich < 2 Düsen, oder irgendein voller Körper, dessen kleinstes Maß unter 2 Düsen liegt
+  const thin = parts.some((p) => !p.hole && ((p.kind === 'extrude' && featureSize(scaledOutline(p)) < 4 * nozzle) || Math.min(p.w, p.d, p.h) < 2 * nozzle - 1e-9));
   return { empty: false, outside, floating, thin };
 }
 
