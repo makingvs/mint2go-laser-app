@@ -60,3 +60,26 @@
 .canvas.measuring {
   cursor: crosshair;
 }
+
+/* Freihand: Wahl zwischen geglättet und wie gezeichnet */
+.flyout.draw-fly {
+  flex-direction: row;
+  gap: 10px;
+}
+.flyout .btn.draw-choice {
+  width: 128px;
+  height: 92px;
+  border-radius: 20px;
+}
+.flyout .btn.draw-choice .lbl {
+  font-size: 15px;
+}
+.flyout .btn.draw-choice.active {
+  background: var(--blue-tint);
+  box-shadow: 0 0 0 3px var(--m-blue) inset;
+}
+.flyout .btn.draw-choice .ico,
+.flyout .btn.draw-choice .ico .icon {
+  width: 40px;
+  height: 40px;
+}
