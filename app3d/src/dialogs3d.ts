@@ -10,7 +10,8 @@ import { svgToShape } from '../../src/svgImport';
 import { GLYPH_HEIGHT, textShape } from '../../src/text';
 import { grayFromRGBA, traceGray } from '../../src/trace';
 import { ICONS3D, KIND_ICONS, SPECIAL_ICONS } from './icons3d';
-import type { FigureCheck } from './figure';
+import { problemText, type FigureCheck } from './figure';
+import { MSG, thinText } from './problems3d';
 import { SHORTCUT_HELP } from './shortcuts3d';
 import type { PrintCheck } from './printExport';
 import type { ExportFormat } from './storage3d';
@@ -119,9 +120,10 @@ export function openSketch(figure = false): Promise<Shape | null> {
     const panel = h('div', 'panel sketch-panel');
     const strokes: Stroke[] = [];
     let current: Stroke | null = null;
-    let line = false;
     const widths = figure ? FIGURE_LINE_WIDTHS : LINE_WIDTHS;
-    let width = widths[1];
+    // Standard: der kleinste Stift (dünnste Linie)
+    let line = true;
+    let width = widths[0];
 
     const canvas = h('canvas', 'sketch-pad');
     const sizeCanvas = () => {
@@ -373,7 +375,7 @@ export type { ExportFormat };
  * Druckprüfung ohne Text: je Prüfung ein Symbol mit grünem Haken (in Ordnung) oder orangem Warnzeichen,
  * dazu die Wahl STL / 3MF. Warnungen sperren nichts. Liefert die Dateiart oder null (Abbrechen).
  */
-export function openExportPanel(check: PrintCheck, initial: ExportFormat, figure?: FigureCheck): Promise<ExportFormat | null> {
+export function openExportPanel(check: PrintCheck, initial: ExportFormat, figure?: FigureCheck, nozzle = 0.4): Promise<ExportFormat | null> {
   return new Promise((resolve) => {
     const o = overlay('overlay-dim');
     const panel = h('div', 'panel export-panel');
@@ -383,23 +385,29 @@ export function openExportPanel(check: PrintCheck, initial: ExportFormat, figure
       resolve(v);
     };
     const cards = h('div', 'chk-row');
-    const card = (icon: string, warn: boolean, label: string) => {
-      const c = h('div', `chk ${warn ? 'warn' : 'ok'}`, `<span class="chk-ico">${icon}</span><span class="badge">${warn ? ICONS.warn : ICONS.check}</span>`);
-      c.setAttribute('role', 'img');
-      c.setAttribute('aria-label', label + (warn ? ': Achtung' : ': in Ordnung'));
-      cards.append(c);
+    // Ein Symbol mit Haken oder Warnzeichen; tippt man auf ein Warnzeichen, steht dort, was nicht stimmt (`text`)
+    const card = (icon: string, warn: boolean, label: string, text: string) => {
+      const inner = `<span class="chk-ico">${icon}</span><span class="badge">${warn ? ICONS.warn : ICONS.check}</span>`;
+      if (!warn) {
+        const c = h('div', 'chk ok', inner);
+        c.setAttribute('role', 'img');
+        c.setAttribute('aria-label', label + ': in Ordnung');
+        cards.append(c);
+        return;
+      }
+      cards.append(button('chk warn', inner, () => void explain(icon, text), label + ': Achtung, antippen für die Erklärung'));
     };
     if (figure) {
       // Spielfigur: Arbeitsfläche, höchstens 30 mm, Überhang, hängt alles zusammen, dünne Stellen
-      card(ICONS3D.bed, figure.outside, 'Breite');
-      card(ICONS3D.height, figure.tooTall, 'Höhe 30 Millimeter');
-      card(ICONS3D.overhang, figure.overhang, 'Überhang');
-      card(ICONS3D.loose, figure.loose, 'Teile hängen zusammen');
-      card(ICONS3D.thin, figure.thin, 'Dünne Stellen');
+      card(ICONS3D.bed, figure.outside, 'Breite', problemText('outside', figure));
+      card(ICONS3D.height, figure.tooTall, 'Höhe 30 Millimeter', problemText('tooTall', figure));
+      card(ICONS3D.overhang, figure.overhang, 'Überhang', problemText('overhang', figure));
+      card(ICONS3D.loose, figure.loose, 'Teile hängen zusammen', problemText('loose', figure));
+      card(ICONS3D.thin, figure.thin, 'Dünne Stellen', problemText('thin', figure));
     } else {
-      card(ICONS3D.bed, check.outside, 'Bauraum');
-      card(ICONS3D.lift, check.floating, 'Schwebt');
-      card(ICONS3D.thin, check.thin, 'Dünne Stellen');
+      card(ICONS3D.bed, check.outside, 'Bauraum', MSG.outside);
+      card(ICONS3D.lift, check.floating, 'Schwebt', MSG.floating);
+      card(ICONS3D.thin, check.thin, 'Dünne Stellen', thinText(nozzle));
     }
 
     const fmts = h('div', 'fmt-row');
@@ -433,7 +441,7 @@ export function openProblems(items: { icon: string; text: string }[]): Promise<v
     const head = h('div', 'panel-head');
     head.append(h('div', 'spacer'), button('btn send', ICONS.check, done, 'Verstanden'));
     const list = h('div', 'problem-list');
-    if (!items.length) list.append(h('div', 'problem ok', `<span class="problem-ico">${ICONS.check}</span><span class="problem-txt">Alles in Ordnung. Du kannst die Figur exportieren.</span>`));
+    if (!items.length) list.append(h('div', 'problem ok', `<span class="problem-ico">${ICONS.check}</span><span class="problem-txt">Alles in Ordnung. Du kannst exportieren.</span>`));
     for (const it of items) list.append(h('div', 'problem', `<span class="problem-ico">${it.icon}</span><span class="problem-txt">${it.text}</span>`));
     panel.append(head, list);
     o.root.append(panel);
@@ -441,6 +449,11 @@ export function openProblems(items: { icon: string; text: string }[]): Promise<v
       if (e.target === o.root) done();
     });
   });
+}
+
+/** Ein einzelnes Problem erklären (statt nur das Warnzeichen zu zeigen): Symbol und ein kurzer Satz. */
+export function explain(icon: string, text: string): Promise<void> {
+  return openProblems([{ icon, text }]);
 }
 
 /** Liste der Tastenkürzel (Taste ?). Schließt mit Esc, ? oder Antippen außerhalb. */

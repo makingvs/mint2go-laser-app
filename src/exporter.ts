@@ -21,6 +21,12 @@ export async function saveFile(name: string, data: BlobPart, mime: string): Prom
       // Teilen nicht möglich: auf Download zurückfallen
     }
   }
+  return downloadFile(name, file);
+}
+
+/** Datei als Download speichern (iPad: landet in "Dateien"; von dort lässt sie sich mit dem Teilen-Menü weitergeben). */
+export function downloadFile(name: string, data: BlobPart | File, mime = 'application/octet-stream'): SaveResult {
+  const file = data instanceof File ? data : new File([data], name, { type: mime });
   const url = URL.createObjectURL(file);
   const a = document.createElement('a');
   a.href = url;

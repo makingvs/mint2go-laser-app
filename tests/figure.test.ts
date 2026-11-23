@@ -18,6 +18,7 @@ import {
 } from '../app3d/src/figure';
 import { PART_KINDS } from '../app3d/src/mesh';
 import { buildZip3d, createFigureDesign, packDesign } from '../app3d/src/designIO';
+import { thinText } from '../app3d/src/problems3d';
 import { makeOutlinePart, newId, type Part } from '../app3d/src/model3d';
 import { buildFinal, type FinalModel } from '../app3d/src/printExport';
 import { restOn } from '../app3d/src/support';
@@ -219,7 +220,9 @@ describe('Druckprüfung der Figur', () => {
     expect(wide.c.reach).toBeGreaterThan(5);
     expect(problemText('overhang', wide.c)).toContain(`${String(wide.c.reach).replace('.', ',')} mm in die Luft`);
     expect(problemText('overhang', wide.c)).toContain('5 mm');
-    expect(problemText('thin', wide.c)).toBe(PROBLEM_TEXT.thin);
+    expect(problemText('thin', wide.c)).toBe(thinText(0.4));
+    expect(problemText('thin', wide.c)).toContain('0,8 mm');
+    expect(problemText('loose', wide.c)).toBe(PROBLEM_TEXT.loose);
   });
 
   it('Löcher zählen nicht als Teil der Figur', async () => {

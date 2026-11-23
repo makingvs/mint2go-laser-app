@@ -36,7 +36,7 @@ export interface Part {
   rot: number; // Drehung um die senkrechte Achse in Grad (0 bis < 360)
 }
 
-export const MIN_SIZE = 2; // kleinste Kantenlänge (mm); darunter druckt kein Drucker sinnvoll
+export const MIN_SIZE = 0.1; // kleinste Kantenlänge (mm); Körper dürfen ganz klein werden, die Druckprüfung erklärt, was zu dünn zum Drucken ist (siehe problems3d.ts)
 export const MAX_SIZE = 500;
 export const SNAP = 1; // beim Ziehen auf ganze mm einrasten
 

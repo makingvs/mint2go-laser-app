@@ -915,6 +915,18 @@ input {
   filter: grayscale(0.8);
   box-shadow: none;
 }
+button.chk {
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+}
+button.chk:active {
+  transform: scale(0.96);
+}
+.btn.labeled.soft {
+  opacity: 0.55; /* Vereinen ohne Auswahl: nicht gesperrt, aber blasser */
+}
 .chk-ico {
   width: 56px;
   height: 56px;

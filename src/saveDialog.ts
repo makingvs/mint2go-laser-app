@@ -13,6 +13,8 @@ export interface SaveDialogOptions {
   icon?: string;
   /** Wird mit dem vollständigen Dateinamen (inkl. Endung) aufgerufen */
   onSave: (fileName: string) => void | Promise<void>;
+  /** Zweite Taste "Herunterladen" (Datei landet in "Dateien" statt im Teilen-Menü); nur wenn angegeben */
+  onDownload?: (fileName: string) => void;
 }
 
 export function openSaveDialog(o: SaveDialogOptions): void {
@@ -30,10 +32,12 @@ export function openSaveDialog(o: SaveDialogOptions): void {
   const suffix = h('span', 'save-ext', `.${o.ext}`);
 
   const ok = button('btn send', ICONS.check, () => confirm(), 'Speichern');
+  const down = o.onDownload ? button('btn', ICONS.download, () => confirm(true), 'Herunterladen') : null;
   const refresh = () => {
     ok.disabled = !sanitizeFileName(input.value, o.ext);
+    if (down) down.disabled = ok.disabled;
   };
-  const confirm = () => {
+  const confirm = (download = false) => {
     const name = sanitizeFileName(input.value, o.ext);
     if (!name) {
       input.classList.remove('shake');
@@ -42,7 +46,8 @@ export function openSaveDialog(o: SaveDialogOptions): void {
       return;
     }
     dlg.close();
-    void o.onSave(name);
+    if (download && o.onDownload) o.onDownload(name);
+    else void o.onSave(name);
   };
   input.addEventListener('input', refresh);
   input.addEventListener('keydown', (e) => {
@@ -52,7 +57,7 @@ export function openSaveDialog(o: SaveDialogOptions): void {
     }
   });
 
-  head.append(button('btn', ICONS.cross, () => dlg.close(), 'Abbrechen'), h('div', 'save-ico', o.icon ?? ICONS.download), input, suffix, ok);
+  head.append(button('btn', ICONS.cross, () => dlg.close(), 'Abbrechen'), h('div', 'save-ico', o.icon ?? ICONS.download), input, suffix, ...(down ? [down] : []), ok);
   panel.append(head);
   dlg.root.append(panel);
   refresh();
